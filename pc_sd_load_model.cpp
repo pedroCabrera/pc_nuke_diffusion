@@ -24,6 +24,9 @@ class pc_sd_load_model : public NoIop,  Executable, public model_loaderNode {
     const char* diffusion_model_path = "";
     const char* high_noise_diffusion_model_path = "";
 
+    const char* embedding_dir = "";
+    const char* photo_maker_path = "";
+
     const char* clip_l_path = "";
     const char* clip_g_path = "";
     const char* clip_vision_path = "";
@@ -105,12 +108,11 @@ public:
             sd_ctx_params.taesd_path = taesd_path;
             sd_ctx_params.control_net_path = controlnet_path;
             sd_ctx_params.lora_model_dir = lora_model_dir;
-            sd_ctx_params.embedding_dir = "";//embedding_dir;
-            sd_ctx_params.stacked_id_embed_dir = "";//stacked_id_embed_dir;
-            sd_ctx_params.vae_decode_only = vae_decode_only;//vae_decode_only;
-            //sd_ctx_params.vae_tiling = false;//vae_tiling;
-            sd_ctx_params.free_params_immediately = false;//Free_params_inmediately;
-            sd_ctx_params.n_threads = get_num_physical_cores();//n_threads;
+            sd_ctx_params.embedding_dir = embedding_dir;
+            sd_ctx_params.photo_maker_path = photo_maker_path;
+            sd_ctx_params.vae_decode_only = vae_decode_only;
+            sd_ctx_params.free_params_immediately = false;
+            sd_ctx_params.n_threads = get_num_physical_cores();
             sd_ctx_params.wtype = SD_TYPE_COUNT;//wtype;
             sd_ctx_params.rng_type = CUDA_RNG;
             sd_ctx_params.offload_params_to_cpu = offload_params_to_cpu;
@@ -191,6 +193,11 @@ public:
     File_knob(f, &controlnet_path, "controlnet", "controlnet");
 
     File_knob(f, &lora_model_dir, "lora_models_directory", "lora_models_directory");
+
+    File_knob(f, &embedding_dir, "embedding_dir", "embedding_dir");
+    File_knob(f, &photo_maker_path, "photo_maker_path", "photo_maker_path");
+    
+
     EndGroup(f);
 
     Bool_knob(f, &vae_decode_only, "vae_decode_only", "vae_decode_only"); 

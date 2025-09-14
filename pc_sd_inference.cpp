@@ -15,33 +15,51 @@ static const char* const CLASS = "pc_sd_inference";
 static const char* const HELP = "Stable Diffusion For Nuke";
 
 class pc_sd_inference : public Iop, Executable{
+
+    int mode = IMG_GEN;
+
     std::vector<const char*> schedule_names;
     std::vector<const char*>sample_method_names;
-    const char* prompt = "A Cgi render of a cute corgi";
-    const char* negative_prompt = "Ugly, blurry, low resolution";
 
-    int seed = -1;
-    int sample_method = 0;    
+    int sample_method = 0; 
     int schedule = 0;
     bool vae_tiling = false;  
+
+    // Format
     double format_w, format_y;
     int cached_format_w, cached_format_y;
+    Format *customFormat;
+    Knob* __formatknob;
+    // Image Generation
+    const char* prompt = "A Cgi render of a cute corgi";
+    const char* negative_prompt = "Ugly, blurry, low resolution";
+    int seed = -1;
     float strength = 1.0;
     int sample_steps = 20;
     int clip_skip = -1;
     float txt_cfg = 7.5;
-    float control_strength = 0.9;
-    float style_strength = 20.0;
+    
     bool normalize_input = false;
+    // ControlNet
     bool canny_preprocess = false;
-
+    float control_strength = 0.9;
+    // Photo Maker
+    float pm_style_strength = 20.0;
+    const char* pm_id_embed_path = "";
+    // Video Generation
+    int fps = 24;
+    int video_frames = 6;
+    int frame_range[2] = {1,7}; // start, end
+    float moe_boundary = 0.875f;
+    float vace_strength = 1.f;
+    
+    // Temporal Files
     bool temp_save = false;
     const char* temp_path = "[python -execlocal {import tempfile;ret = tempfile.gettempdir()+'/pc_nuke_diffusion'}]";
 
     bool use_init_image_as_ref = false;
 
     sd_image_t* results = NULL;
-
     sd_image_t init_image;
     sd_image_t mask_image;
     sd_image_t end_image;
@@ -49,14 +67,12 @@ class pc_sd_inference : public Iop, Executable{
 
     std::vector<sd_image_t> ref_images;
     std::vector<sd_image_t> control_frames;
-
-    Format *customFormat;
-    Knob* __formatknob;
-
+    std::vector<sd_image_t> pmid_images;
     
     sd_sample_params_t sample_params;
     sd_sample_params_t high_noise_sample_params;
     sd_img_gen_params_t img_gen_params;
+    sd_vid_gen_params_t vid_gen_params;
     sd_tiling_params_t vae_tiling_params = {false, 0, 0, 0.5f, 0.0f, 0.0f};
     
     int token_ = 0;
@@ -74,6 +90,7 @@ public:
         sd_sample_params_init(&sample_params);
         sd_img_gen_params_init(&img_gen_params);  
         sd_sample_params_init(&high_noise_sample_params);
+        sd_vid_gen_params_init(&vid_gen_params);
         high_noise_sample_params.sample_steps = -1;              
     }
     bool debug_mode = true;
@@ -236,9 +253,13 @@ public:
             img_gen_params.batch_count = 1;//params.batch_count,
             img_gen_params.control_image = control_image;
             img_gen_params.control_strength = control_strength;
-            img_gen_params.style_strength = style_strength;
             img_gen_params.normalize_input = normalize_input;
-            img_gen_params.input_id_images_path = "";//params.input_id_images_path.c_str(),
+            img_gen_params.pm_params = {
+                pmid_images.data(),
+                (int)pmid_images.size(),
+                pm_id_embed_path,
+                pm_style_strength,
+            },  // pm_params                     
             img_gen_params.vae_tiling_params = vae_tiling_params;
 
 
@@ -323,12 +344,17 @@ public:
 
     void knobs(Knob_Callback f)
     {
+        Enumeration_knob(f, &mode, modes_str, "mode", "mode");
         const char* renderScript = "nuke.execute(nuke.thisNode(), nuke.frame(), nuke.frame(), 1)";
         PyScript_knob(f, renderScript, "Execute");
         __formatknob = WH_knob(f,&format_w,"format","format");
-        SetFlags(f, Knob::SLIDER | Knob::NO_PROXYSCALE);
-        ClearFlags(f, Knob::MAGNITUDE);
-    
+        //SetFlags(f, Knob::SLIDER | Knob::NO_PROXYSCALE);
+        ClearFlags(f, Knob::SLIDER | Knob::MAGNITUDE);
+        
+        MultiInt_knob(f, frame_range, 2, "frame_range", "frame_range");
+        //Int_knob(f, &fps, "fps", "fps");
+        //SetFlags(f, Knob::SLIDER);
+
         Multiline_String_knob(f, &prompt, "prompt", "prompt",5 );
         Multiline_String_knob(f, &negative_prompt, "negative_prompt", "negative_prompt", 5 );
 
@@ -350,8 +376,15 @@ public:
         Int_knob(f, &clip_skip, "clip_skip", "clip_skip");
         EndGroup(f);
 
+        BeginGroup(f, "Wan Video");
+        Float_knob(f, &moe_boundary, "moe_boundary", "moe_boundary");
+        SetFlags(f, Knob::SLIDER);
+        Float_knob(f, &vace_strength, "vace_strength", "vace_strength");
+        SetFlags(f, Knob::SLIDER);
+        EndGroup(f);
+
         //Bool_knob(f, &normalize_input, "normalize_input", "normalize_input");      
-        //Float_knob(f, &style_strength, "style_strength", "style_strength");
+        //Float_knob(f, &pm_style_strength, "photomaker_style_strength", "photomaker_style_strength");
         //Bool_knob(f, &vae_tiling, "vae_tiling", "vae_tiling");
 
         BeginGroup(f, "ControlNet");
@@ -363,7 +396,6 @@ public:
         BeginGroup(f, "Temp Files");
         Bool_knob(f, &temp_save, "save_temporal_files", "save_temporal_files");
         SetFlags(f, Knob::STARTLINE );  
-
         File_knob(f, &temp_path, "temp_path", "temp_path");
         SetFlags(f, Knob::STARTLINE );
         EndGroup(f);

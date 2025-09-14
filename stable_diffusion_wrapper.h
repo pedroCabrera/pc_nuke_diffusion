@@ -70,6 +70,19 @@ std::vector<const char*> get_sd_type_names() {
     return names;
 }
 
+const char* modes_str[] = {
+    "img_gen",
+    "vid_gen",
+    nullptr,
+};
+
+enum SDMode {
+    IMG_GEN,
+    VID_GEN,
+    CONVERT,
+    MODE_COUNT
+};
+
 class model_loaderNode {
 public:
     virtual ~model_loaderNode() = default;
