@@ -29,24 +29,35 @@ class pc_sd_inference : public Iop, Executable{
     float strength = 1.0;
     int sample_steps = 20;
     int clip_skip = -1;
-    float cfg_scale = 7.5;
-    float control_strength = 20.0;
+    float txt_cfg = 7.5;
+    float control_strength = 0.9;
     float style_strength = 20.0;
     bool normalize_input = false;
-    float min_cfg = 1.0;
     bool canny_preprocess = false;
 
     bool temp_save = false;
     const char* temp_path = "[python -execlocal {import tempfile;ret = tempfile.gettempdir()+'/pc_nuke_diffusion'}]";
 
     bool use_init_image_as_ref = false;
-    sd_image_t control_image; 
+
     sd_image_t* results = NULL;
+
     sd_image_t init_image;
     sd_image_t mask_image;
+    sd_image_t end_image;
+    sd_image_t control_image;
+
     std::vector<sd_image_t> ref_images;
+    std::vector<sd_image_t> control_frames;
+
     Format *customFormat;
     Knob* __formatknob;
+
+    
+    sd_sample_params_t sample_params;
+    sd_sample_params_t high_noise_sample_params;
+    sd_img_gen_params_t img_gen_params;
+    sd_tiling_params_t vae_tiling_params = {false, 0, 0, 0.5f, 0.0f, 0.0f};
     
     int token_ = 0;
 
@@ -60,6 +71,10 @@ public:
         format_w = format_y = 512;   
         schedule_names = get_schedule_names();    
         sample_method_names = get_sample_method_names();
+        sd_sample_params_init(&sample_params);
+        sd_img_gen_params_init(&img_gen_params);  
+        sd_sample_params_init(&high_noise_sample_params);
+        high_noise_sample_params.sample_steps = -1;              
     }
     bool debug_mode = true;
     std::atomic<unsigned> m_progress{0};
@@ -154,8 +169,8 @@ public:
             error("Connect a model.");
             return;
         }
-        // Check if the input node implements AbstractDataInterface
-        AbstractDataInterface* dataNode = dynamic_cast<AbstractDataInterface*>(node_input(1));
+        // Check if the input node implements model_loaderNode
+        model_loaderNode* dataNode = dynamic_cast<model_loaderNode*>(node_input(1));
         if (!dataNode) {
             error("Connect a pc_sd_load_model Node please.");
             return;
@@ -190,20 +205,21 @@ public:
                 };
             }
 
-            sd_sample_params_t sample_params;
-            sd_sample_params_init(&sample_params);
-
+            // Scheduler and Sample params
             sample_params.scheduler = (scheduler_t)schedule;
             sample_params.sample_method = (sample_method_t)sample_method;
             sample_params.sample_steps = sample_steps;
+            sample_params.guidance.txt_cfg = txt_cfg;
+            
+            if (!isfinite(sample_params.guidance.img_cfg)) {
+                sample_params.guidance.img_cfg = sample_params.guidance.txt_cfg;
+            }
 
-            sample_params.guidance.txt_cfg = cfg_scale;
-            sample_params.guidance.img_cfg = cfg_scale;
-            //sample_params.guidance.distilled_guidance = cfg_scale;
+            if (!isfinite(high_noise_sample_params.guidance.img_cfg)) {
+                high_noise_sample_params.guidance.img_cfg = high_noise_sample_params.guidance.txt_cfg;
+            }     
 
-            sd_img_gen_params_t img_gen_params;
-            sd_img_gen_params_init(&img_gen_params);
-
+            // Image Params
             img_gen_params.prompt = prompt;
             img_gen_params.negative_prompt = negative_prompt;
             img_gen_params.clip_skip = clip_skip;
@@ -223,12 +239,15 @@ public:
             img_gen_params.style_strength = style_strength;
             img_gen_params.normalize_input = normalize_input;
             img_gen_params.input_id_images_path = "";//params.input_id_images_path.c_str(),
+            img_gen_params.vae_tiling_params = vae_tiling_params;
+
 
             printf("inferencing\n");
             free(results);
-            results     = generate_image(sd_ctx, &img_gen_params);
             cached_format_w = format_w;
             cached_format_y = format_y;
+
+            results     = generate_image(sd_ctx, &img_gen_params);
 
             if(isConnected(1)){
                 if(use_init_image_as_ref == false){
@@ -306,42 +325,51 @@ public:
     {
         const char* renderScript = "nuke.execute(nuke.thisNode(), nuke.frame(), nuke.frame(), 1)";
         PyScript_knob(f, renderScript, "Execute");
-
-        Bool_knob(f, &temp_save, "save_temporal_files", "save_temporal_files");
-        SetFlags(f, Knob::STARTLINE );  
-
-        File_knob(f, &temp_path, "temp_path", "temp_path");
-        SetFlags(f, Knob::STARTLINE );
-
-        Int_knob(f, &token_, "token", "");               // hidden version knob
-        SetFlags(f, Knob::INVISIBLE | Knob::NO_ANIMATION);
-        Bool_knob(f, &use_init_image_as_ref, "use_init_image_as_ref", "use_init_image_as_ref");
-        SetFlags(f, Knob::STARTLINE );
-
         __formatknob = WH_knob(f,&format_w,"format","format");
         SetFlags(f, Knob::SLIDER | Knob::NO_PROXYSCALE);
         ClearFlags(f, Knob::MAGNITUDE);
     
         Multiline_String_knob(f, &prompt, "prompt", "prompt",5 );
         Multiline_String_knob(f, &negative_prompt, "negative_prompt", "negative_prompt", 5 );
-        
-        Int_knob(f, &seed, "seed", "seed");
-        SetFlags(f, Knob::SLIDER);
-        //SetRange(f, IRange(0, 100000));
-        //Float_knob(f, &min_cfg, "min_cfg", "min_cfg");
-        Float_knob(f, &cfg_scale, "cfg_scale", "cfg_scale");
-        Float_knob(f, &strength, "strength", "strength");
-        Bool_knob(f, &normalize_input, "normalize_input", "normalize_input");
-        //Float_knob(f, &control_strength, "control_strength", "control_strength");
-        //Float_knob(f, &style_strength, "style_strength", "style_strength");
-        Int_knob(f, &sample_steps, "sample_steps", "sample_steps");
-        SetFlags(f, Knob::SLIDER); 
+
+        Bool_knob(f, &use_init_image_as_ref, "use_init_image_as_ref", "use_init_image_as_ref");
+        SetFlags(f, Knob::STARTLINE );
+
+        BeginGroup(f, "Sample Params");
         Enumeration_knob(f, &sample_method, sample_method_names.data(), "sample_method", "sample_method");   
         Enumeration_knob(f, &schedule, schedule_names.data(), "schedule", "schedule");  
-        //Bool_knob(f, &vae_tiling, "vae_tiling", "vae_tiling");
-        Int_knob(f, &clip_skip, "clip_skip", "clip_skip");
-        //Bool_knob(f,&canny_preprocess, "canny_preprocess","canny_preprocess");
 
+        Int_knob(f, &sample_steps, "sample_steps", "sample_steps");
+        SetFlags(f, Knob::SLIDER);
+
+        Int_knob(f, &seed, "seed", "seed");
+        SetFlags(f, Knob::SLIDER);
+
+        Float_knob(f, &txt_cfg, "txt_cfg", "txt_cfg");
+        Float_knob(f, &strength, "strength", "strength");
+        Int_knob(f, &clip_skip, "clip_skip", "clip_skip");
+        EndGroup(f);
+
+        //Bool_knob(f, &normalize_input, "normalize_input", "normalize_input");      
+        //Float_knob(f, &style_strength, "style_strength", "style_strength");
+        //Bool_knob(f, &vae_tiling, "vae_tiling", "vae_tiling");
+
+        BeginGroup(f, "ControlNet");
+        Bool_knob(f,&canny_preprocess, "canny_preprocess","canny_preprocess");
+        SetFlags(f, Knob::STARTLINE );        
+        Float_knob(f, &control_strength, "control_strength", "control_strength");
+        EndGroup(f);
+
+        BeginGroup(f, "Temp Files");
+        Bool_knob(f, &temp_save, "save_temporal_files", "save_temporal_files");
+        SetFlags(f, Knob::STARTLINE );  
+
+        File_knob(f, &temp_path, "temp_path", "temp_path");
+        SetFlags(f, Knob::STARTLINE );
+        EndGroup(f);
+
+        Int_knob(f, &token_, "token", "");               // Force update when changed
+        SetFlags(f, Knob::INVISIBLE | Knob::NO_ANIMATION);        
     }    
     const char* Class() const { return desc.name; };
     const char* node_help() const { return HELP; };
@@ -362,6 +390,7 @@ void sd_prog_call(int step, int steps, float time, void* data){
     //    printf("User aborted\n");
     //}
 }
+
 void pc_sd_inference::execute() {
     sd_set_progress_callback(sd_prog_call, this);
     m_progress.store(0, std::memory_order_relaxed);
@@ -371,6 +400,7 @@ void pc_sd_inference::execute() {
     Knob* t = knob("token");
     if (t) t->set_value(token_);        
 }
+
 static Iop* pc_sd_inferenceCreate(Node* node)
 {
   return new pc_sd_inference(node);

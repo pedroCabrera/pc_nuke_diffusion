@@ -18,7 +18,7 @@ static const char* const HELP = "Stable Diffusion For Nuke";
 
 
 
-class pc_sd_load_model : public NoIop,  Executable, public AbstractDataInterface {
+class pc_sd_load_model : public NoIop,  Executable, public model_loaderNode {
 
     const char* model_path = "[python {os.getenv('STD_MODEL') + '/v1-5-pruned-emaonly.safetensors'}]";
     const char* diffusion_model_path = "";

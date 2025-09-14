@@ -70,9 +70,9 @@ std::vector<const char*> get_sd_type_names() {
     return names;
 }
 
-class AbstractDataInterface {
+class model_loaderNode {
 public:
-    virtual ~AbstractDataInterface() = default;
+    virtual ~model_loaderNode() = default;
 
     // Pure virtual methods to be implemented by derived classes
     virtual sd_ctx_t* get_ctxt() const = 0;
