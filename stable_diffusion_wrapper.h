@@ -83,6 +83,18 @@ enum SDMode {
     MODE_COUNT
 };
 
+const char* video_modes_str[] = {
+    "img2video",
+    "first_last",
+    "video2video",
+    nullptr,
+};
+
+enum SD_Video_Mode {
+    IMG2VID,
+    FL2VID,
+    V2V,
+};
 class model_loaderNode {
 public:
     virtual ~model_loaderNode() = default;
@@ -229,4 +241,36 @@ void save_image(const sd_image_t& img, const std::string output_path, bool is_jp
                        img.data, 0);
         printf("save result PNG image to '%s'\n", final_image_path.c_str());
     }
+}
+
+void nuke_sd_log_cb(enum sd_log_level_t level, const char* log, void* data) {
+    int tag_color;
+    const char* level_str;
+    FILE* out_stream = (level == SD_LOG_ERROR) ? stderr : stdout;
+
+    if (!log) {
+        return;
+    }
+    switch (level) {
+        case SD_LOG_DEBUG:
+            level_str = "DEBUG";
+            break;
+        case SD_LOG_INFO:
+            level_str = "INFO";
+            break;
+        case SD_LOG_WARN:
+            level_str = "WARN";
+            break;
+        case SD_LOG_ERROR:
+            level_str = "ERROR";
+            break;
+        default: /* Potential future-proofing */
+            level_str = "?????";
+            break;
+    }
+
+    fprintf(out_stream, "[%-5s] ", level_str);
+
+    fputs(log, out_stream);
+    fflush(out_stream);
 }

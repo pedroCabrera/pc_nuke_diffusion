@@ -17,6 +17,8 @@ static const char* const HELP = "Stable Diffusion For Nuke";
 class pc_sd_inference : public Iop, Executable{
 
     int mode = IMG_GEN;
+    int video_mode = IMG2VID;
+    int output_index = 0;
 
     std::vector<const char*> schedule_names;
     std::vector<const char*>sample_method_names;
@@ -31,15 +33,14 @@ class pc_sd_inference : public Iop, Executable{
     Format *customFormat;
     Knob* __formatknob;
     // Image Generation
-    const char* prompt = "A Cgi render of a cute corgi";
-    const char* negative_prompt = "Ugly, blurry, low resolution";
+    const char* prompt = "Black and white dog, sitting, shaggy fur, cartoon style, expressive, whimsical,  medium shot,  detailed fur texture,  unconventional hairstyle,  light background,  studio lighting";
+    const char* negative_prompt = "Ugly, blurry, low resolution, deformed, disfigured, mutated, extra limbs, poorly drawn, bad anatomy, blurry, fuzzy, out of focus, long neck, long body, mutated hands and fingers, poorly drawn hands and fingers, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, jpeg artifacts, ugly";
     int seed = -1;
     float strength = 1.0;
     int sample_steps = 20;
     int clip_skip = -1;
     float txt_cfg = 7.5;
     
-    bool normalize_input = false;
     // ControlNet
     bool canny_preprocess = false;
     float control_strength = 0.9;
@@ -47,8 +48,7 @@ class pc_sd_inference : public Iop, Executable{
     float pm_style_strength = 20.0;
     const char* pm_id_embed_path = "";
     // Video Generation
-    int fps = 24;
-    int video_frames = 6;
+    int curr_frame = 1;
     int frame_range[2] = {1,7}; // start, end
     float moe_boundary = 0.875f;
     float vace_strength = 1.f;
@@ -60,6 +60,7 @@ class pc_sd_inference : public Iop, Executable{
     bool use_init_image_as_ref = false;
 
     sd_image_t* results = NULL;
+    int num_results = 1;
     sd_image_t init_image;
     sd_image_t mask_image;
     sd_image_t end_image;
@@ -98,32 +99,32 @@ public:
     std::string m_progress_message = "Inferencing...";
     sd_ctx_t* sd_ctx = NULL;
 
-    const char* input_label(int input, char* buffer) const
-    {
-    switch (input) {
-        case 0:
-        return "Input Image";        
-        case 1:
-        return "Model";
-        case 2:
-        return "ControlNet Image";  
-        case 3:
-        return "Ref_1";              
-        case 4:
-        return "Ref_2";   
-        case 5:
-        return "Ref_3";
-        case 6:
-        return "Ref_4";                        
-        default:
-        return 0;
+    const char* input_label(int input, char* buffer) const{
+        switch (input) {
+            case 0:
+            return "Input Image";
+            case 1:
+            return "Model";
+            case 2:
+            return "ControlNet Image";
+            case 3:
+            return "Ref_1";
+            case 4:
+            return "Ref_2";
+            case 5:
+            return "Ref_3";
+            case 6:
+            return "Ref_4";
+            default:
+            return 0;
+        }
     }
-    }
+  
     //int minimum_inputs() const { return 1; }
     int optional_input() const {return 3;};
     
     void beginExecuting(){}
-    void endExecuting(){}  
+    void endExecuting(){}
     void execute();
     
     bool isConnected(int inputIndex) {
@@ -155,6 +156,11 @@ public:
         }
         if(cached_format_w != format_w || cached_format_y != format_y){
             printf("Format changed, clearing cache\n");
+            if (results != NULL) {
+            for (int i = 0; i < num_results; i++) {
+                free(results[i].data);
+                results[i].data = NULL;
+            }}
             free(results);
             results = NULL;
             cached_format_w = format_w;
@@ -165,6 +171,7 @@ public:
     void getRequests(const Box& bbox, const DD::Image::ChannelSet& channels, int count, RequestOutput &reqData) const
     {
         reqData.request( input(0), bbox, channels + Chan_Alpha, count);
+        reqData.request( input(2), bbox, channels, count);
         reqData.request( input(3), bbox, channels, count);
         reqData.request( input(4), bbox, channels, count);
         reqData.request( input(5), bbox, channels, count);
@@ -197,30 +204,7 @@ public:
         sd_ctx = dataNode->get_ctxt();
         
         if (sd_ctx) {
-            sd_image_t sample_init_image = {(uint32_t)format_w, (uint32_t)format_y, 3, NULL};
-            if(isConnected(0)) {
-                printf("Input Image connected\n"); 
-                sd_images_out init_data = input2sdimages(input(0),format_w,format_y,true);
-                init_image = init_data.rgb;
-                mask_image = init_data.alpha;
-                if(init_data.has_alpha){
-                    printf("Image has a mask\n"); 
-                }
-                if(use_init_image_as_ref){
-                    ref_images.push_back(init_image);
-                }
-                if(strength < 1.0){
-                    sample_init_image = init_image;                    
-                }
-            }
-            for (size_t i = 3; i < 7; i++)
-            {
-                if(isConnected(i)){
-                    printf("Ref Image %zu connected\n",i-2); 
-                    sd_images_out init_data = input2sdimages(input(i),format_w,format_y,false);
-                    ref_images.push_back(init_data.rgb);            
-                };
-            }
+
 
             // Scheduler and Sample params
             sample_params.scheduler = (scheduler_t)schedule;
@@ -236,39 +220,100 @@ public:
                 high_noise_sample_params.guidance.img_cfg = high_noise_sample_params.guidance.txt_cfg;
             }     
 
-            // Image Params
-            img_gen_params.prompt = prompt;
-            img_gen_params.negative_prompt = negative_prompt;
-            img_gen_params.clip_skip = clip_skip;
-            img_gen_params.init_image = sample_init_image;
-            img_gen_params.ref_images = ref_images.data();
-            img_gen_params.ref_images_count = (int)ref_images.size();
-            img_gen_params.increase_ref_index = false;//params.increase_ref_index;
-            img_gen_params.mask_image = mask_image;
-            img_gen_params.width = format_w;
-            img_gen_params.height = format_y;
-            img_gen_params.sample_params = sample_params;
-            img_gen_params.strength = strength;
-            img_gen_params.seed = seed;
-            img_gen_params.batch_count = 1;//params.batch_count,
-            img_gen_params.control_image = control_image;
-            img_gen_params.control_strength = control_strength;
-            img_gen_params.normalize_input = normalize_input;
-            img_gen_params.pm_params = {
-                pmid_images.data(),
-                (int)pmid_images.size(),
-                pm_id_embed_path,
-                pm_style_strength,
-            },  // pm_params                     
-            img_gen_params.vae_tiling_params = vae_tiling_params;
 
-
-            printf("inferencing\n");
+            printf("Cleaning Cached Results\n");
+            if (results != NULL) {
+            for (int i = 0; i < num_results; i++) {
+                free(results[i].data);
+                results[i].data = NULL;
+            }}
             free(results);
+            results = NULL;
+
             cached_format_w = format_w;
             cached_format_y = format_y;
+            num_results = 1;
+            sd_image_t sample_init_image = {(uint32_t)format_w, (uint32_t)format_y, 3, NULL};                
+            if(isConnected(0)) {
+                printf("Input Image connected\n"); 
+                sd_images_out init_data = input2sdimages(input(0),format_w,format_y,true);
+                init_image = init_data.rgb;
+                mask_image = init_data.alpha;
+                if(init_data.has_alpha){
+                    printf("Image has a mask\n"); 
+                }
+                if(use_init_image_as_ref){
+                    ref_images.push_back(init_image);
+                }
+                sample_init_image = init_image;
+            }
 
-            results     = generate_image(sd_ctx, &img_gen_params);
+            if (mode == IMG_GEN){
+                // Control Net Image
+                if(isConnected(2)) {
+                    printf("Control Net Image connected\n"); 
+                    sd_images_out init_data = input2sdimages(input(2),format_w,format_y,true);
+                    control_image = init_data.rgb;
+                }
+                // Reference Images
+                for (size_t i = 3; i < 7; i++)
+                {
+                    if(isConnected(i)){
+                        printf("Ref Image %zu connected\n",i-2);
+                        sd_images_out init_data = input2sdimages(input(i),format_w,format_y,false);
+                        ref_images.push_back(init_data.rgb);
+                    };
+                }
+
+                // Image Params
+                img_gen_params.prompt = prompt;
+                img_gen_params.negative_prompt = negative_prompt;
+                img_gen_params.clip_skip = clip_skip;
+                img_gen_params.init_image = sample_init_image;
+                img_gen_params.ref_images = ref_images.data();
+                img_gen_params.ref_images_count = (int)ref_images.size();
+                img_gen_params.increase_ref_index = false;//params.increase_ref_index;
+                img_gen_params.mask_image = mask_image;
+                img_gen_params.width = format_w;
+                img_gen_params.height = format_y;
+                img_gen_params.sample_params = sample_params;
+                img_gen_params.strength = strength;
+                img_gen_params.seed = seed;
+                img_gen_params.batch_count = 1;//params.batch_count,
+                img_gen_params.control_image = control_image;
+                img_gen_params.control_strength = control_strength;
+                img_gen_params.pm_params = {
+                    pmid_images.data(),
+                    (int)pmid_images.size(),
+                    pm_id_embed_path,
+                    pm_style_strength,
+                },                  
+                img_gen_params.vae_tiling_params = vae_tiling_params;     
+                printf("Generating Image\n");
+                results     = generate_image(sd_ctx, &img_gen_params);
+            }else if (mode == VID_GEN){
+
+                num_results = (frame_range[1] - frame_range[0]);
+
+                vid_gen_params.prompt = prompt;
+                vid_gen_params.negative_prompt = negative_prompt;
+                vid_gen_params.clip_skip = clip_skip;
+                vid_gen_params.init_image = sample_init_image;
+                vid_gen_params.end_image = end_image;
+                vid_gen_params.control_frames = control_frames.data();
+                vid_gen_params.control_frames_size = (int)control_frames.size();
+                vid_gen_params.width = format_w;
+                vid_gen_params.height = format_y;
+                vid_gen_params.sample_params = sample_params;
+                vid_gen_params.high_noise_sample_params = high_noise_sample_params;
+                vid_gen_params.moe_boundary = moe_boundary;
+                vid_gen_params.strength = strength;
+                vid_gen_params.seed = seed;
+                vid_gen_params.vace_strength = vace_strength;                
+                vid_gen_params.video_frames = num_results;
+
+                results     = generate_video(sd_ctx, &vid_gen_params, &num_results);
+            }
 
             if(isConnected(1)){
                 if(use_init_image_as_ref == false){
@@ -293,8 +338,10 @@ public:
             } else{
                 printf("inference done\n");
                 if(temp_save){
-                    save_image(results[0], temp_path, false);
-                    printf("Saved temporal files to %s\n", temp_path);
+                    for(int i=0;i<num_results;i++){
+                        save_image(results[i], temp_path, false);
+                        printf("Saved temporal files to %s\n", temp_path);
+                    }
                 }
             }            
         } else {
@@ -307,7 +354,7 @@ public:
         out.erase(channels);                  // zero requested channels first
 
         if (results == NULL) return;
-
+        int result_index = (output_index < 0) ? 0 : ((output_index >= num_results-1) ? num_results-1 : output_index);
         const Format f = format();            // current output format
         const int fx = f.x(), fy = f.y(), fr = f.r(), ft = f.t();
         const int W  = fr - fx;
@@ -318,11 +365,9 @@ public:
         int xi1 = (std::min)(r, fr);
         if (xi0 >= xi1 || y < fy || y >= ft) return;
 
-        // If your cached image has top-left origin, flip Y like your Iop code:
         const bool flipY = true;
         const int srcY   = flipY ? (H - 1 - (y - fy)) : (y - fy);
 
-        // base index into your packed RGB list
         size_t idx = (size_t(srcY) * W + (xi0 - fx)) * 3;
 
         // Grab writable channel pointers (only if requested)
@@ -331,11 +376,10 @@ public:
         float* B = (channels & Mask_Blue)  ? out.writable(Chan_Blue)  + xi0 : nullptr;
 
         for (int xi = xi0; xi < xi1; ++xi) {
-            float r8 = static_cast<float>(results[0].data[idx++]);
-            float g8 = static_cast<float>(results[0].data[idx++]);
-            float b8 = static_cast<float>(results[0].data[idx++]);
+            float r8 = static_cast<float>(results[result_index].data[idx++]);
+            float g8 = static_cast<float>(results[result_index].data[idx++]);
+            float b8 = static_cast<float>(results[result_index].data[idx++]);
 
-            // match your original scale (you had /10); change to /255.f if you want normalized
             if (R) *R++ = r8 / 255.f;
             if (G) *G++ = g8 / 255.f;
             if (B) *B++ = b8 / 255.f;
@@ -345,15 +389,26 @@ public:
     void knobs(Knob_Callback f)
     {
         Enumeration_knob(f, &mode, modes_str, "mode", "mode");
-        const char* renderScript = "nuke.execute(nuke.thisNode(), nuke.frame(), nuke.frame(), 1)";
+        Enumeration_knob(f, &video_mode, video_modes_str, "video_mode", "video_mode");
+        //const char* renderScript = "nuke.execute(nuke.thisNode(), nuke.frame(), nuke.frame(), 1)";
+        const char* renderScript =  "n = nuke.thisNode()\n"
+                                    "mode = n['mode'].value()\n"
+                                    "video_mode = n['video_mode'].value()\n"
+                                    "if mode == 'vid_gen' and video_mode == 'video2video':\n"
+                                    "    first = int(n['frame_range'].value(0))\n"
+                                    "    last  = int(n['frame_range'].value(1))\n"
+                                    "else:\n"
+                                    "    first = last = nuke.frame()\n"
+                                    "nuke.execute(n, first, last, 1)\n";
         PyScript_knob(f, renderScript, "Execute");
         __formatknob = WH_knob(f,&format_w,"format","format");
         //SetFlags(f, Knob::SLIDER | Knob::NO_PROXYSCALE);
         ClearFlags(f, Knob::SLIDER | Knob::MAGNITUDE);
         
         MultiInt_knob(f, frame_range, 2, "frame_range", "frame_range");
-        //Int_knob(f, &fps, "fps", "fps");
-        //SetFlags(f, Knob::SLIDER);
+
+        Int_knob(f, &output_index, "output_index", "output_index");
+        SetFlags(f, Knob::SLIDER);
 
         Multiline_String_knob(f, &prompt, "prompt", "prompt",5 );
         Multiline_String_knob(f, &negative_prompt, "negative_prompt", "negative_prompt", 5 );
@@ -382,8 +437,7 @@ public:
         Float_knob(f, &vace_strength, "vace_strength", "vace_strength");
         SetFlags(f, Knob::SLIDER);
         EndGroup(f);
-
-        //Bool_knob(f, &normalize_input, "normalize_input", "normalize_input");      
+  
         //Float_knob(f, &pm_style_strength, "photomaker_style_strength", "photomaker_style_strength");
         //Bool_knob(f, &vae_tiling, "vae_tiling", "vae_tiling");
 
@@ -427,7 +481,35 @@ void pc_sd_inference::execute() {
     sd_set_progress_callback(sd_prog_call, this);
     m_progress.store(0, std::memory_order_relaxed);
     m_progress_message = "Starting...";
-    sample_sd();
+    if( mode == VID_GEN && video_mode == V2V ){
+        curr_frame = outputContext().frame();
+        if (curr_frame < frame_range[0] || curr_frame > frame_range[1])
+            return;
+        if(curr_frame == frame_range[0]){
+            // Clean up control frames
+            printf("Cleaning Control Frames\n");
+            for (auto& frame : control_frames) {
+                if (frame.data) {
+                    free(frame.data);
+                    frame.data = NULL;
+                }
+            }
+            control_frames.clear();            
+        }  
+                        
+        // Control Video
+        if(isConnected(2)){
+            printf("Reading Control Frame %zu\n",curr_frame); 
+            sd_images_out init_data = input2sdimages(input(2),format_w,format_y,false);
+            control_frames.push_back(init_data.rgb);
+        };
+        if(curr_frame == frame_range[1]){
+            sample_sd();
+        }
+    }else{
+        sample_sd();
+    }
+
     ++token_;
     Knob* t = knob("token");
     if (t) t->set_value(token_);        

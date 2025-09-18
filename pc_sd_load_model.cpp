@@ -246,7 +246,6 @@ public:
 };
 void sd_log_cb(enum sd_log_level_t level, const char* log, void* data) {
     pc_sd_load_model* node = (pc_sd_load_model*)data;
-    int tag_color;
     const char* level_str;
     FILE* out_stream = (level == SD_LOG_ERROR) ? stderr : stdout;
 
@@ -255,23 +254,18 @@ void sd_log_cb(enum sd_log_level_t level, const char* log, void* data) {
     }
     switch (level) {
         case SD_LOG_DEBUG:
-            tag_color = 37;
             level_str = "DEBUG";
             break;
         case SD_LOG_INFO:
-            tag_color = 34;
             level_str = "INFO";
             break;
         case SD_LOG_WARN:
-            tag_color = 35;
             level_str = "WARN";
             break;
         case SD_LOG_ERROR:
-            tag_color = 31;
             level_str = "ERROR";
             break;
         default: /* Potential future-proofing */
-            tag_color = 33;
             level_str = "?????";
             break;
     }
