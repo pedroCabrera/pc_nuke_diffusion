@@ -1,3 +1,6 @@
 [submodule "packages/stable-diffusion.cpp"]
 	path = packages/stable-diffusion.cpp
 	url = https://github.com/leejet/stable-diffusion.cpp.git
+[submodule "packages/Maxine-VFX-SDK"]
+	path = packages/Maxine-VFX-SDK
+	url = https://github.com/NVIDIA-Maxine/Maxine-VFX-SDK.git
