@@ -15,15 +15,18 @@ Wan2.1/Wan2.2](https://github.com/leejet/stable-diffusion.cpp#:~:text=Image%20Mo
 
 I highly recommend checking the [stable-diffusion.cpp documentation](https://github.com/leejet/stable-diffusion.cpp/tree/master/docs)
 
-Also Support for [Nvidia Maxine](https://docs.nvidia.com/deeplearning/maxine/vfx-sdk-system-guide/index.html) Filters:
-**Encoder Artifact Reduction (Beta)**, which reduces the blocking and noisy artifacts that are produced from encoding while preserving the details of the original video.
+Also Support for some [Nvidia Maxine](https://docs.nvidia.com/deeplearning/maxine/vfx-sdk-system-guide/index.html) Filters:
+
+- **Encoder Artifact Reduction (Beta)**, which reduces the blocking and noisy artifacts that are produced from encoding while preserving the details of the original video.
 The ArtifactReduction effect has the following modes:
     Strength 0, which applies a weak effect.
     Strength 1, which applies a strong effect.
-**Super resolution (Beta)**, which upscales a video and reduces encoding artifacts. This filter enhances the details, sharpens the output, and preserves the content. The SuperRes effect has two modes:
+    
+- **Super resolution (Beta)**, which upscales a video and reduces encoding artifacts. This filter enhances the details, sharpens the output, and preserves the content. The SuperRes effect has two modes:
     Strength 1, which applies strong enhancements.
     Strength 0, which applies weaker enhancements while reducing encoding artifacts.
-**Upscale (Beta)**, which is a fast and light-weight method to upscale for an input video and sharpen the resulting output.
+    
+- **Upscale (Beta)**, which is a fast and light-weight method to upscale for an input video and sharpen the resulting output.
 This filter can optionally be pipelined with encoder artifact reduction to enhance the scale while reducing the video artifacts.
 
 Will add more nuke specific documentation in the future
