@@ -16,6 +16,8 @@ CMakeUserPresets.json
 build/
 out/
 models/
-sd.exe
-modified_cpp/
+
+*.exe
 nuke/
+packages/NVIDIA_VIDEO_EFFECTS_INSTAL_PATH
+packages/*.exe
