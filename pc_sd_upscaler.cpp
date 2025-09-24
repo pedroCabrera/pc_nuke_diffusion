@@ -131,6 +131,9 @@ public:
             if (upscaler_ctx == NULL) {
                 error("Failed To load model.");
             }
+            upscale_factor = get_upscale_factor(upscaler_ctx);
+            Knob* t = knob("upscale_factor");
+            if (t) t->set_value(upscale_factor);              
             return 1;
         }
         return PlanarIop::knob_changed(k);
@@ -139,13 +142,17 @@ public:
     void knobs(Knob_Callback f)
     {
         Button(f, "reload_model", "Reload Model");
+        SetFlags(f, Knob::STARTLINE );
 
         File_knob(f, &model_path, "model_path", "model_path" );
+        SetFlags(f, Knob::STARTLINE );
         Int_knob(f, &upscale_factor, "upscale_factor", "upscale_factor");
-        SetFlags(f, Knob::SLIDER);
+        SetFlags(f, Knob::READ_ONLY);
         //Float_knob(f, &min_cfg, "min_cfg", "min_cfg");
         Bool_knob(f, &offload_params_to_cpu, "offload_params_to_cpu", "offload_params_to_cpu");
+        SetFlags(f, Knob::STARTLINE );
         Bool_knob(f, &diffusion_conv_direct, "diffusion_conv_direct", "diffusion_conv_direct");
+        SetFlags(f, Knob::STARTLINE );
 
     }    
     const char* Class() const { return desc.name; };
