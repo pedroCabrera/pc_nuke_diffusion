@@ -40,7 +40,6 @@ public:
         return "Input Image";
     }
     }
-    //int minimum_inputs() const { return 1; }
 
     bool useStripes() { return false; };
     virtual bool renderFullPlanes() const { return true; };
@@ -83,7 +82,7 @@ public:
 
         if(isConnected(0)) {
             printf("Input Image connected\n"); 
-            init_data = input2sdimages(input(0),format_w,format_y,true);
+            init_data = input2sdimages(input(0),(int)format_w,(int)format_y,true);
             upscaled_image = upscale(upscaler_ctx, init_data.rgb, upscale_factor);
             free(init_data.rgb.data);
                                             
@@ -107,15 +106,16 @@ public:
                     float r = static_cast<float>(upscaled_image.data[iter++]);
                     float g = static_cast<float>(upscaled_image.data[iter++]);
                     float b = static_cast<float>(upscaled_image.data[iter++]);
-                    outputPlane.writableAt(it.x,(format_y*upscale_factor)-1-it.y,outputPlane.chanNo(red)) = r/255;
-                    outputPlane.writableAt(it.x,(format_y*upscale_factor)-1-it.y,outputPlane.chanNo(green)) = g/255;
-                    outputPlane.writableAt(it.x,(format_y*upscale_factor)-1-it.y,outputPlane.chanNo(blue)) = b/255;
+                    outputPlane.writableAt(it.x,((int)format_y*upscale_factor)-1-it.y,outputPlane.chanNo(red)) = r/255;
+                    outputPlane.writableAt(it.x,((int)format_y*upscale_factor)-1-it.y,outputPlane.chanNo(green)) = g/255;
+                    outputPlane.writableAt(it.x,((int)format_y*upscale_factor)-1-it.y,outputPlane.chanNo(blue)) = b/255;
                 }
                 free(upscaled_image.data);
                 
             }
         }
     }
+
     int  knob_changed(DD::Image::Knob* k)
     {
         if (k->is("reload_model"))
@@ -155,9 +155,9 @@ public:
         SetFlags(f, Knob::STARTLINE );
 
     }    
+
     const char* Class() const { return desc.name; };
     const char* node_help() const { return HELP; };
-
     static const Iop::Description desc;  
 };
 

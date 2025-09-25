@@ -33,8 +33,20 @@ class pc_sd_inference : public Iop, Executable{
     Format *customFormat;
     Knob* __formatknob;
     // Image Generation
-    const char* prompt = "Black and white dog, sitting, shaggy fur, cartoon style, expressive, whimsical,  medium shot,  detailed fur texture,  unconventional hairstyle,  light background,  studio lighting";
-    const char* negative_prompt = "Ugly, blurry, low resolution, deformed, disfigured, mutated, extra limbs, poorly drawn, bad anatomy, blurry, fuzzy, out of focus, long neck, long body, mutated hands and fingers, poorly drawn hands and fingers, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, jpeg artifacts, ugly";
+    const char* prompt =    "Black and white dog, sitting, shaggy fur, cartoon style, expressive, whimsical,  medium shot,"
+                            "detailed fur texture,  unconventional hairstyle,  light background,  studio lighting,"
+                             "high detail, 8k,  vibrant colors,  intricate details,  dramatic lighting,  cinematic composition,"
+                             "soft lighting,  bright colors,  highly detailed,  sharp focus,  award winning photography,"
+                             "masterpiece,  best quality,  ultra-detailed,  photo-realistic,  realistic texture,"
+                             "intricate patterns,  symmetrical design,  ornate details,  elegant composition,"
+                             "beautiful lighting,  vibrant colors,  rich textures,  captivating details,"
+                             "fantasy art,  surreal landscape,  magical atmosphere,  ethereal quality,"
+                             "dynamic pose,  expressive face,";
+                         ;
+    const char* negative_prompt =   "Ugly, blurry, low resolution, deformed, disfigured, mutated, extra limbs,"
+                                    "poorly drawn, bad anatomy, blurry, fuzzy, out of focus, long neck, long body,"
+                                    "mutated hands and fingers, poorly drawn hands and fingers, missing fingers,"
+                                    "extra digit, fewer digits, cropped, worst quality, low quality, jpeg artifacts, ugly";
     int seed = -1;
     float strength = 1.0;
     int sample_steps = 20;
@@ -119,8 +131,8 @@ public:
             return 0;
         }
     }
-  
-    //int minimum_inputs() const { return 1; }
+    
+    // Referenced inputs are optional
     int optional_input() const {return 3;};
     
     void beginExecuting(){}
@@ -176,19 +188,19 @@ public:
         reqData.request( input(4), bbox, channels, count);
         reqData.request( input(5), bbox, channels, count);
         reqData.request( input(6), bbox, channels, count);
-        //reqData.request( input(2), bbox, channels, count);
     }    
     
-    unsigned int getFrameProgress() const override {            // 0..100
+    unsigned int getFrameProgress() const override {
         return m_progress.load(std::memory_order_relaxed);
     }
+
     std::string getFrameProgressMessage() const override {
         return m_progress_message;
     }
 
 
     void sample_sd(){
-        // Get the input node
+        // Check if the model input is connected
         if (!isConnected(1)) {
             error("Connect a model.");
             return;
@@ -204,8 +216,6 @@ public:
         sd_ctx = dataNode->get_ctxt();
         
         if (sd_ctx) {
-
-
             // Scheduler and Sample params
             sample_params.scheduler = (scheduler_t)schedule;
             sample_params.sample_method = (sample_method_t)sample_method;
@@ -218,22 +228,23 @@ public:
 
             if (!isfinite(high_noise_sample_params.guidance.img_cfg)) {
                 high_noise_sample_params.guidance.img_cfg = high_noise_sample_params.guidance.txt_cfg;
-            }     
-
+            }
 
             printf("Cleaning Cached Results\n");
             if (results != NULL) {
-            for (int i = 0; i < num_results; i++) {
-                free(results[i].data);
-                results[i].data = NULL;
-            }}
+                for (int i = 0; i < num_results; i++) {
+                    free(results[i].data);
+                    results[i].data = NULL;
+                }}
             free(results);
             results = NULL;
 
             cached_format_w = format_w;
             cached_format_y = format_y;
             num_results = 1;
-            sd_image_t sample_init_image = {(uint32_t)format_w, (uint32_t)format_y, 3, NULL};                
+            sd_image_t sample_init_image = {(uint32_t)format_w, (uint32_t)format_y, 3, NULL};
+
+            // Input Image
             if(isConnected(0)) {
                 printf("Input Image connected\n"); 
                 sd_images_out init_data = input2sdimages(input(0),format_w,format_y,true);
@@ -252,7 +263,7 @@ public:
                 // Control Net Image
                 if(isConnected(2)) {
                     printf("Control Net Image connected\n"); 
-                    sd_images_out init_data = input2sdimages(input(2),format_w,format_y,true);
+                    sd_images_out init_data = input2sdimages(input(2),format_w,format_y,false);
                     control_image = init_data.rgb;
                 }
                 // Reference Images
@@ -323,6 +334,10 @@ public:
                 printf("Cleaning Mask\n");
                 free(mask_image.data); 
             }
+            if(isConnected(2)){
+                printf("Cleaning Control IMAGE\n");
+                free(control_image.data);
+            }            
             printf("Cleaning Refs\n");
             for (auto ref_image : ref_images) {
                 if(ref_image.data ){

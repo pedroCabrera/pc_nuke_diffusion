@@ -59,30 +59,30 @@ public:
         return (node_input(inputIndex)!=nullptr);
     }
 
-void _validate(bool /*for_real*/) override
-{
-    if (!isConnected(0)) return;
+    void _validate(bool /*for_real*/) override
+    {
+        if (!isConnected(0)) return;
 
-    const Format inFmt = input(0)->format();
-    format_w = inFmt.w();
-    format_y = inFmt.h();
+        const Format inFmt = input(0)->format();
+        format_w = inFmt.w();
+        format_y = inFmt.h();
 
-    const char* fx = effect_names[effect];
-    const bool scales =
-        (strcmp(fx, "Upscale") == 0) || (strcmp(fx, "SuperRes") == 0);
+        const char* fx = effect_names[effect];
+        const bool scales =
+            (strcmp(fx, "Upscale") == 0) || (strcmp(fx, "SuperRes") == 0);
 
-    const int outW = scales ? format_w * upscale_factor : format_w;
-    const int outH = scales ? format_y * upscale_factor : format_y;
+        const int outW = scales ? format_w * upscale_factor : format_w;
+        const int outH = scales ? format_y * upscale_factor : format_y;
 
-    delete customFormat;
-    customFormat = new Format(outW, outH);
+        delete customFormat;
+        customFormat = new Format(outW, outH);
 
-    info_.format(*customFormat);
-    info_.full_size_format(*customFormat);
-    info_.x(0); info_.y(0);
-    info_.r(outW); info_.t(outH);
-    info_.turn_on(Mask_RGBA);
-}
+        info_.format(*customFormat);
+        info_.full_size_format(*customFormat);
+        info_.x(0); info_.y(0);
+        info_.r(outW); info_.t(outH);
+        info_.turn_on(Mask_RGBA);
+    }
     
     void getRequests(const Box& bbox, const DD::Image::ChannelSet& channels, int count, RequestOutput &reqData) const
     {
@@ -97,10 +97,11 @@ void _validate(bool /*for_real*/) override
         if (!app._eff || !app._effectName || strcmp(app._effectName, want) != 0) {
             app.destroyEffect();
         }
-
+        // Set parameters
         app.FLAG_strength      = strength;
         app.FLAG_mode          = mode;
         app.FLAG_upscaleFactor = upscale_factor;
+        // Create the effect if needed
         if (!app._eff) {
             fxErr = app.createEffect(want, model_path);
             if (fxErr != FXApp::errNone) {
@@ -108,18 +109,14 @@ void _validate(bool /*for_real*/) override
                 return;
             }
         }
-
-        // Tell the wrapper the current input size (so it allocates right)
-        app.updateRes(format_w, format_y);
-
-        // Run the effect (fills app._dstVFX on CPU)
+        // Run the effect
         fxErr = app.processImage(input(0));
         if (fxErr != FXApp::errNone) {
             error("NvVFX processing failed: %s", app.errorStringFromCode(fxErr));
             return;
         }
 
-        // Blit the wrapper's CPU output into Nuke
+        // Write out to nuke image plane
         outputPlane.makeWritable();
         if (!NvCVToImagePlane(app._dstVFX, outputPlane)) {
             error("Unsupported NvCV output format (expect RGBA8 or BGR8 interleaved).");
@@ -137,12 +134,10 @@ void _validate(bool /*for_real*/) override
         SetFlags(f, Knob::SLIDER);
         Float_knob(f, &strength, "strength", "strength");
         SetFlags(f, Knob::SLIDER);
-        //Float_knob(f, &min_cfg, "min_cfg", "min_cfg");
+    }
 
-    }    
     const char* Class() const { return desc.name; };
     const char* node_help() const { return HELP; };
-
     static const Iop::Description desc;  
 };
 

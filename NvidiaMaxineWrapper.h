@@ -33,8 +33,9 @@
 #include "DDImage/Knobs.h"
 #include "DDImage/NukeWrapper.h"
 
+// Include Nvidia Maxine headers
 #include "nvVideoEffects.h"
-#include "NvCVImage.h"           // NvCVImage utilities
+#include "NvCVImage.h"
 
 #ifdef _MSC_VER
   #define strcasecmp _stricmp
@@ -59,117 +60,6 @@ using namespace DD::Image;
 // This path is used by nvVideoEffectsProxy.cpp to load the SDK dll
 // when using  OTA Updates
 char *g_nvVFXSDKPath = NULL;
-
-static inline uint8_t f2u8(float v) {
-    v = std::clamp(v, 0.0f, 1.0f);
-    return (uint8_t)(v * 255.0f + 0.5f);
-}
-
-/**
- * Convert Nuke input -> NvCV RGBA8 (interleaved) in ONE pass.
- * - Expects 'dst' already allocated with allocRGBA8_CPU(dst, w, h).
- * - Writes with TOP-LEFT origin (what we want for NvCV/Maxine).
- * - Reads from Nuke with input->at(x, ny, Chan_*), flipping Y once.
- */
-// Nuke input -> NvCV (interleaved), in one pass. Writes top-left origin (flip once).
-static NvCV_Status inputToNvCV(Iop* input, NvCVImage* dst, bool expect_alpha = true)
-{
-    if (!input || !dst || !dst->pixels) return NVCV_ERR_PARAMETER;
-
-    const ChannelSet ch = input->channels();
-    const bool hasA = ch.contains(Chan_Alpha);
-
-    const Format f = input->format();
-    const int w = f.w(), h = f.h();
-
-    const bool wantRGBA = (dst->pixelFormat == NVCV_RGBA);
-    const bool wantBGR  = (dst->pixelFormat == NVCV_BGR);
-
-    auto* base = static_cast<unsigned char*>(dst->pixels);
-    const size_t pitch = dst->pitch;
-
-    for (int y = 0; y < h; ++y) {
-        const int ny = h - 1 - y;                  // flip Y once
-        unsigned char* outRow = base + (size_t)y * pitch;
-
-        for (int x = 0; x < w; ++x) {
-            const float rf = ch.contains(Chan_Red)   ? input->at(x, ny, Chan_Red)   : 0.f;
-            const float gf = ch.contains(Chan_Green) ? input->at(x, ny, Chan_Green) : 0.f;
-            const float bf = ch.contains(Chan_Blue)  ? input->at(x, ny, Chan_Blue)  : 0.f;
-            const float af = (hasA && expect_alpha)  ? input->at(x, ny, Chan_Alpha) : 1.f;
-
-            if (wantRGBA) {
-                const int di = x * 4;
-                outRow[di + 0] = f2u8(rf);
-                outRow[di + 1] = f2u8(gf);
-                outRow[di + 2] = f2u8(bf);
-                outRow[di + 3] = f2u8(af);
-            } else if (wantBGR) {
-                const int di = x * 3;
-                outRow[di + 0] = f2u8(bf);  // B
-                outRow[di + 1] = f2u8(gf);  // G
-                outRow[di + 2] = f2u8(rf);  // R
-            } else {
-                return NVCV_ERR_PIXELFORMAT; // choose dst format to match your effect
-            }
-        }
-    }
-    return NVCV_SUCCESS;
-}
-
-static bool NvCVToImagePlane(const NvCVImage& src, DD::Image::ImagePlane& dst)
-{
-    using namespace DD::Image;
-
-    // We support interleaved U8 RGBA and BGR outputs from your wrapper.
-    const bool isRGBA8 = (src.pixelFormat == NVCV_RGBA && src.componentType == NVCV_U8 && src.planar == NVCV_INTERLEAVED);
-    const bool isBGR8  = (src.pixelFormat == NVCV_BGR  && src.componentType == NVCV_U8 && src.planar == NVCV_INTERLEAVED);
-    if (!isRGBA8 && !isBGR8 || !src.pixels) return false;
-
-    const Box b = dst.bounds();
-    const int W = b.w(), H = b.h();
-
-    ChannelMask ch = dst.channels();
-    Channel cr = ch.first();
-    Channel cg = ch.next(cr);
-    Channel cb = ch.next(cg);
-    Channel ca = ch.next(cb);
-    const bool hasA = (ca != Chan_Black);
-
-    const int rNo = dst.chanNo(cr);
-    const int gNo = dst.chanNo(cg);
-    const int bNo = dst.chanNo(cb);
-    const int aNo = hasA ? dst.chanNo(ca) : -1;
-
-    const unsigned char* base = static_cast<const unsigned char*>(src.pixels);
-    const size_t pitch = src.pitch;
-
-    // Write once, flipping Y back for Nuke
-    for (int y = 0; y < H; ++y) {
-        const int ny = b.y() + (H - 1 - y);               // vertical flip
-        const unsigned char* inRow = base + (size_t)y * pitch;
-
-        for (int x = 0; x < W; ++x) {
-            const int nx = b.x() + x;
-
-            if (isRGBA8) {
-                const int si = x * 4;
-                dst.writableAt(nx, ny, rNo) = inRow[si + 0] / 255.0f;
-                dst.writableAt(nx, ny, gNo) = inRow[si + 1] / 255.0f;
-                dst.writableAt(nx, ny, bNo) = inRow[si + 2] / 255.0f;
-                if (hasA) dst.writableAt(nx, ny, aNo) = inRow[si + 3] / 255.0f;
-            } else { // BGR8
-                const int si = x * 3;
-                dst.writableAt(nx, ny, rNo) = inRow[si + 2] / 255.0f; // R from BGR
-                dst.writableAt(nx, ny, gNo) = inRow[si + 1] / 255.0f; // G
-                dst.writableAt(nx, ny, bNo) = inRow[si + 0] / 255.0f; // B
-                if (hasA) dst.writableAt(nx, ny, aNo) = 1.0f;
-            }
-        }
-    }
-    return true;
-}
-
 struct FXApp {
     enum Err {
         errQuit               = +1,                         // Application errors
@@ -333,26 +223,130 @@ bail:
     return vfxErr;
 }
 
+
+static inline uint8_t f2u8(float v) {
+    v = std::clamp(v, 0.0f, 1.0f);
+    return (uint8_t)(v * 255.0f + 0.5f);
+}
+
+/**
+ * Convert Nuke input -> NvCV RGBA8 (interleaved) in ONE pass.
+ * - Expects 'dst' already allocated with allocRGBA8_CPU(dst, w, h).
+ * - Writes with TOP-LEFT origin (what we want for NvCV/Maxine).
+ * - Reads from Nuke with input->at(x, ny, Chan_*), flipping Y once.
+ */
+static NvCV_Status inputToNvCV(Iop* input, NvCVImage* dst, bool expect_alpha = true)
+{
+    if (!input || !dst || !dst->pixels) return NVCV_ERR_PARAMETER;
+
+    const ChannelSet ch = input->channels();
+    const bool hasA = ch.contains(Chan_Alpha);
+
+    const Format f = input->format();
+    const int w = f.w(), h = f.h();
+
+    const bool wantRGBA = (dst->pixelFormat == NVCV_RGBA);
+    const bool wantBGR  = (dst->pixelFormat == NVCV_BGR);
+
+    auto* base = static_cast<unsigned char*>(dst->pixels);
+    const size_t pitch = dst->pitch;
+
+    for (int y = 0; y < h; ++y) {
+        const int ny = h - 1 - y;                  // Vertical Flip
+        unsigned char* outRow = base + (size_t)y * pitch;
+
+        for (int x = 0; x < w; ++x) {
+            const float rf = ch.contains(Chan_Red)   ? input->at(x, ny, Chan_Red)   : 0.f;
+            const float gf = ch.contains(Chan_Green) ? input->at(x, ny, Chan_Green) : 0.f;
+            const float bf = ch.contains(Chan_Blue)  ? input->at(x, ny, Chan_Blue)  : 0.f;
+            const float af = (hasA && expect_alpha)  ? input->at(x, ny, Chan_Alpha) : 1.f;
+
+            if (wantRGBA) {
+                const int di = x * 4;
+                outRow[di + 0] = f2u8(rf);
+                outRow[di + 1] = f2u8(gf);
+                outRow[di + 2] = f2u8(bf);
+                outRow[di + 3] = f2u8(af);
+            } else if (wantBGR) {
+                const int di = x * 3;
+                outRow[di + 0] = f2u8(bf);  // B
+                outRow[di + 1] = f2u8(gf);  // G
+                outRow[di + 2] = f2u8(rf);  // R
+            } else {
+                return NVCV_ERR_PIXELFORMAT;
+            }
+        }
+    }
+    return NVCV_SUCCESS;
+}
+
+static bool NvCVToImagePlane(const NvCVImage& src, DD::Image::ImagePlane& dst)
+{
+    using namespace DD::Image;
+    const bool isRGBA8 = (src.pixelFormat == NVCV_RGBA && src.componentType == NVCV_U8 && src.planar == NVCV_INTERLEAVED);
+    const bool isBGR8  = (src.pixelFormat == NVCV_BGR  && src.componentType == NVCV_U8 && src.planar == NVCV_INTERLEAVED);
+    if (!isRGBA8 && !isBGR8 || !src.pixels) return false;
+
+    const Box b = dst.bounds();
+    const int W = b.w(), H = b.h();
+
+    ChannelMask ch = dst.channels();
+    Channel cr = ch.first();
+    Channel cg = ch.next(cr);
+    Channel cb = ch.next(cg);
+    Channel ca = ch.next(cb);
+    const bool hasA = (ca != Chan_Black);
+
+    const int rNo = dst.chanNo(cr);
+    const int gNo = dst.chanNo(cg);
+    const int bNo = dst.chanNo(cb);
+    const int aNo = hasA ? dst.chanNo(ca) : -1;
+
+    const unsigned char* base = static_cast<const unsigned char*>(src.pixels);
+    const size_t pitch = src.pitch;
+
+    for (int y = 0; y < H; ++y) {
+        const int ny = b.y() + (H - 1 - y);               // vertical flip
+        const unsigned char* inRow = base + (size_t)y * pitch;
+
+        for (int x = 0; x < W; ++x) {
+            const int nx = b.x() + x;
+
+            if (isRGBA8) {
+                const int si = x * 4;
+                dst.writableAt(nx, ny, rNo) = inRow[si + 0] / 255.0f;
+                dst.writableAt(nx, ny, gNo) = inRow[si + 1] / 255.0f;
+                dst.writableAt(nx, ny, bNo) = inRow[si + 2] / 255.0f;
+                if (hasA) dst.writableAt(nx, ny, aNo) = inRow[si + 3] / 255.0f;
+            } else { // BGR8
+                const int si = x * 3;
+                dst.writableAt(nx, ny, rNo) = inRow[si + 2] / 255.0f; // R from BGR
+                dst.writableAt(nx, ny, gNo) = inRow[si + 1] / 255.0f; // G
+                dst.writableAt(nx, ny, bNo) = inRow[si + 0] / 255.0f; // B
+                if (hasA) dst.writableAt(nx, ny, aNo) = 1.0f;
+            }
+        }
+    }
+    return true;
+}
+
 FXApp::Err FXApp::processImage(Iop* input) {
     CUstream stream = 0;
     NvCV_Status vfxErr;
 
     if (!_eff) return errEffect;
     updateRes(input->format().w(),input->format().h());
-    // Make sure sizes are set (call updateRes before)
     BAIL_IF_ERR(vfxErr = allocBuffers(src_width, src_height));
-    // 1) Fill CPU staging (_srcVFX) in one pass, matching its pixelFormat
-    BAIL_IF_ERR(vfxErr = inputToNvCV(input, &_srcVFX,
-                      /*expect_alpha=*/ (_srcVFX.pixelFormat == NVCV_RGBA)));
-    // 2) CPU->GPU (with conversion as needed)
-    // - AR/SR: U8 interleaved BGR -> F32 planar BGR (scale 1/255.f)
-    // - Upscale: U8 interleaved RGBA -> U8 interleaved RGBA (scale 1.f)
+    BAIL_IF_ERR(vfxErr = inputToNvCV(input, &_srcVFX,(_srcVFX.pixelFormat == NVCV_RGBA)));
+
     const float uploadScale = (_srcGpuBuf.componentType == NVCV_F32) ? (1.f/255.f) : 1.f;
     BAIL_IF_ERR(vfxErr = NvCVImage_Transfer(&_srcVFX, &_srcGpuBuf, uploadScale, stream, &_tmpVFX));
+
     // 3) Set images + params
     BAIL_IF_ERR(vfxErr = NvVFX_SetImage(_eff, NVVFX_INPUT_IMAGE,  &_srcGpuBuf));
     BAIL_IF_ERR(vfxErr = NvVFX_SetImage(_eff, NVVFX_OUTPUT_IMAGE, &_dstGpuBuf));
     BAIL_IF_ERR(vfxErr = NvVFX_SetCudaStream(_eff, NVVFX_CUDA_STREAM, stream));
+    
     if (!strcmp(_effectName, NVVFX_FX_SUPER_RES) || !strcmp(_effectName, NVVFX_FX_ARTIFACT_REDUCTION)){
         BAIL_IF_ERR(vfxErr = NvVFX_SetU32(_eff, NVVFX_MODE, (unsigned)FLAG_mode));
         

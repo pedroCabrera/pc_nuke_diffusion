@@ -1,17 +1,5 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
-if (MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4244")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4101")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4018")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4996")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4305")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4715")
-
-endif()
-
 add_subdirectory(packages/stable-diffusion.cpp)
 
 project(pc_nuke_diffusion LANGUAGES C CXX CUDA)

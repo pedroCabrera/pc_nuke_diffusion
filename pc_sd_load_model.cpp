@@ -16,8 +16,6 @@ using namespace DD::Image;
 static const char* const CLASS = "pc_sd_load_model";
 static const char* const HELP = "Stable Diffusion For Nuke";
 
-
-
 class pc_sd_load_model : public NoIop,  Executable, public model_loaderNode {
 
     const char* model_path = "[python {os.getenv('STD_MODEL') + '/v1-5-pruned-emaonly.safetensors'}]";
@@ -72,9 +70,6 @@ public:
     std::atomic<unsigned> m_progress{0};
     std::string m_progress_message;
 
-    bool useStripes() { return false; };
-    virtual bool renderFullPlanes() const { return true; };    
-    void renderStripe( ImagePlane& outputPlane) {}
     void beginExecuting(){}
     void endExecuting(){}
     void execute();
@@ -170,7 +165,6 @@ public:
         return sd_ctx;
     }
 
-
     void knobs(Knob_Callback f) override {
     const char* renderScript = "nuke.execute(nuke.thisNode(), nuke.frame(), nuke.frame(), 1)";
     PyScript_knob(f, renderScript, "Load Model");
@@ -241,9 +235,9 @@ public:
     
   const char* Class() const { return desc.name; };
   const char* node_help() const { return HELP; };
-
   static const Iop::Description desc;  
 };
+
 void sd_log_cb(enum sd_log_level_t level, const char* log, void* data) {
     pc_sd_load_model* node = (pc_sd_load_model*)data;
     const char* level_str;
@@ -284,6 +278,7 @@ void sd_prog_call(int step, int steps, float time, void* data){
     nuke_pretty_progress(step, steps, time);
 
 }
+
 void pc_sd_load_model::execute() {
     sd_set_log_callback(sd_log_cb, this);
     sd_set_progress_callback(sd_prog_call, this);

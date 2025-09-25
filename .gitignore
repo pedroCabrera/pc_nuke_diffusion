@@ -23,3 +23,5 @@ packages/NVIDIA_VIDEO_EFFECTS_INSTAL_PATH
 packages/*.exe
 python/
 *.zip
+
+tests/

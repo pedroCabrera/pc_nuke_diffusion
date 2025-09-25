@@ -42,7 +42,7 @@ std::vector<const char*> get_schedule_names() {
     for (int i = 0; i < SCHEDULE_COUNT; ++i) {
         names.push_back(sd_schedule_name(scheduler_t(i)));
     }
-    names.push_back(nullptr); // Optional, for compatibility
+    names.push_back(nullptr);
     return names;
 }
 std::vector<const char*> get_sample_method_names() {
@@ -50,7 +50,7 @@ std::vector<const char*> get_sample_method_names() {
     for (int i = 0; i < SAMPLE_METHOD_COUNT; ++i) {
         names.push_back(sd_sample_method_name(sample_method_t(i)));
     }
-    names.push_back(nullptr); // Optional, for compatibility
+    names.push_back(nullptr);
     return names;
 }
 std::vector<const char*> get_rng_type_names() {
@@ -58,7 +58,7 @@ std::vector<const char*> get_rng_type_names() {
     for (int i = 0; i < RNG_TYPE_COUNT; ++i) {
         names.push_back(sd_rng_type_name(rng_type_t(i)));
     }
-    names.push_back(nullptr); // Optional, for compatibility
+    names.push_back(nullptr);
     return names;
 }
 std::vector<const char*> get_sd_type_names() {
@@ -66,7 +66,7 @@ std::vector<const char*> get_sd_type_names() {
     for (int i = 0; i < SD_TYPE_COUNT; ++i) {
         names.push_back(sd_type_name(sd_type_t(i)));
     }
-    names.push_back(nullptr); // Optional, for compatibility
+    names.push_back(nullptr);
     return names;
 }
 
@@ -95,18 +95,17 @@ enum SD_Video_Mode {
     FL2VID,
     V2V,
 };
-class model_loaderNode {
-public:
-    virtual ~model_loaderNode() = default;
-
-    // Pure virtual methods to be implemented by derived classes
-    virtual sd_ctx_t* get_ctxt() const = 0;
-};
 
 struct sd_images_out {
     sd_image_t rgb;           
     sd_image_t alpha;         
     bool has_alpha = false;
+};
+
+class model_loaderNode {
+public:
+    virtual ~model_loaderNode() = default;
+    virtual sd_ctx_t* get_ctxt() const = 0;
 };
 
 static inline uint8_t f2u8(float v) {
@@ -119,30 +118,27 @@ sd_images_out input2sdimages(Iop* input, int w, int h, bool expect_alpha = true)
 {
     sd_images_out out;
 
-    // What channels does the input actually have?
+    // Get Input Channels
     ChannelSet inChans = input->channels();
     
-    const bool hasA = inChans.contains(Chan_Alpha);
-
     // Prepare RGB buffer
     out.rgb.width   = w;
     out.rgb.height  = h;
     out.rgb.channel = 3;
     out.rgb.data    = (uint8_t*)malloc(out.rgb.width * out.rgb.height * out.rgb.channel);
 
-    out.alpha.width   = out.rgb.width;
-    out.alpha.height  = out.rgb.height;
-    out.alpha.channel = 1;
-    out.alpha.data    = (uint8_t*)malloc(out.alpha.width * out.alpha.height);
-    // Optional alpha buffer
-    if (hasA) {
-        out.has_alpha     = true;
+    if (expect_alpha){
+        out.alpha.width   = out.rgb.width;
+        out.alpha.height  = out.rgb.height;
+        out.alpha.channel = 1;
+        out.alpha.data    = (uint8_t*)malloc(out.alpha.width * out.alpha.height);
+        out.has_alpha     = inChans.contains(Chan_Alpha);
     }
-    // Sample; flip Y if your consumer expects top-left origin
+
     int iterRGB = 0;
     int iterA   = 0;
     for (int y = 0; y < out.rgb.height; ++y) {
-        const int ny = out.rgb.height - 1 - y; // remove this flip if you want bottom-left origin
+        const int ny = out.rgb.height - 1 - y; // Flip Y
         for (int x = 0; x < out.rgb.width; ++x) {
             const float r = inChans.contains(Chan_Red)   ? input->at(x, ny, Chan_Red)   : 0.f;
             const float g = inChans.contains(Chan_Green) ? input->at(x, ny, Chan_Green) : 0.f;
@@ -151,12 +147,9 @@ sd_images_out input2sdimages(Iop* input, int w, int h, bool expect_alpha = true)
             out.rgb.data[iterRGB++] = f2u8(r);
             out.rgb.data[iterRGB++] = f2u8(g);
             out.rgb.data[iterRGB++] = f2u8(b);
-
-            if (hasA && expect_alpha) {
-                const float a = input->at(x, ny, Chan_Alpha);
-                out.alpha.data[iterA++] = f2u8(a);
-            }else{
-                out.alpha.data[iterA++] = f2u8(1.0);
+            if(expect_alpha){
+                if (out.has_alpha)   out.alpha.data[iterA++] = f2u8(input->at(x, ny, Chan_Alpha));
+                else                 out.alpha.data[iterA++] = f2u8(1.0);
             }
         }
     }
