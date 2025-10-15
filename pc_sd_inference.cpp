@@ -9,6 +9,7 @@
 #include "stable-diffusion.h"
 #include "stable_diffusion_wrapper.h"
 
+
 using namespace DD::Image;
 
 static const char* const CLASS = "pc_sd_inference";
@@ -247,7 +248,7 @@ public:
             // Input Image
             if(isConnected(0)) {
                 printf("Input Image connected\n"); 
-                sd_images_out init_data = input2sdimages(input(0),format_w,format_y,true);
+                sd_images_out init_data = input2sdimages(input(0),(int)format_w,(int)format_y,true);
                 init_image = init_data.rgb;
                 mask_image = init_data.alpha;
                 if(init_data.has_alpha){
@@ -263,7 +264,7 @@ public:
                 // Control Net Image
                 if(isConnected(2)) {
                     printf("Control Net Image connected\n"); 
-                    sd_images_out init_data = input2sdimages(input(2),format_w,format_y,false);
+                    sd_images_out init_data = input2sdimages(input(2),(int)format_w,(int)format_y,false);
                     control_image = init_data.rgb;
                 }
                 // Reference Images
@@ -271,7 +272,7 @@ public:
                 {
                     if(isConnected(i)){
                         printf("Ref Image %zu connected\n",i-2);
-                        sd_images_out init_data = input2sdimages(input(i),format_w,format_y,false);
+                        sd_images_out init_data = input2sdimages(input(i),(int)format_w,(int)format_y,false);
                         ref_images.push_back(init_data.rgb);
                     };
                 }
@@ -478,7 +479,7 @@ public:
     static const Iop::Description desc;  
 };
 
-void sd_prog_call(int step, int steps, float time, void* data){
+inline void sd_prog_call(int step, int steps, float time, void* data){
     unsigned p = static_cast<unsigned>((step) * 100 / steps);
     pc_sd_inference* node = (pc_sd_inference*)data;
     node->m_progress.store(p, std::memory_order_relaxed);
@@ -515,7 +516,7 @@ void pc_sd_inference::execute() {
         // Control Video
         if(isConnected(2)){
             printf("Reading Control Frame %zu\n",curr_frame); 
-            sd_images_out init_data = input2sdimages(input(2),format_w,format_y,false);
+            sd_images_out init_data = input2sdimages(input(2),(int)format_w,(int)format_y,false);
             control_frames.push_back(init_data.rgb);
         };
         if(curr_frame == frame_range[1]){

@@ -2,9 +2,8 @@
 #include "DDImage/Row.h"
 #include "DDImage/Knobs.h"
 #include "DDImage/NukeWrapper.h"
-#include <memory>
-
 #include "DDImage/Executable.h"
+#include <memory>
 
 // Include Stable Diffusion headers
 #include "stable-diffusion.h"
@@ -271,7 +270,7 @@ void sd_log_cb(enum sd_log_level_t level, const char* log, void* data) {
     node->m_progress_message =log;
 }
 
-void sd_prog_call(int step, int steps, float time, void* data){
+inline void sd_prog_call(int step, int steps, float time, void* data){
     unsigned p = static_cast<unsigned>((step) * 100 / steps);
     pc_sd_load_model* node = (pc_sd_load_model*)data;
     node->m_progress.store(p, std::memory_order_relaxed);

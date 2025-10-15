@@ -18,7 +18,12 @@ out/
 models/
 
 *.exe
-nuke/
+*.dll
+*.lib
+*.pdb
+*.log
+*.obj
+*.exp
 packages/NVIDIA_VIDEO_EFFECTS_INSTAL_PATH
 packages/*.exe
 python/

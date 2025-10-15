@@ -4,9 +4,11 @@
 #include "DDImage/NukeWrapper.h"
 #include <memory>
 
+
 // Include Stable Diffusion headers
 #include "stable-diffusion.h"
 #include "stable_diffusion_wrapper.h"
+
 
 using namespace DD::Image;
 
@@ -118,7 +120,7 @@ public:
 
     int  knob_changed(DD::Image::Knob* k)
     {
-        if (k->is("reload_model"))
+        if (k->is("reload_model") || k->is("model_path"))
         {
             if (upscaler_ctx) {
                 free_upscaler_ctx(upscaler_ctx);
@@ -148,7 +150,7 @@ public:
         SetFlags(f, Knob::STARTLINE );
         Int_knob(f, &upscale_factor, "upscale_factor", "upscale_factor");
         SetFlags(f, Knob::READ_ONLY);
-        //Float_knob(f, &min_cfg, "min_cfg", "min_cfg");
+
         Bool_knob(f, &offload_params_to_cpu, "offload_params_to_cpu", "offload_params_to_cpu");
         SetFlags(f, Knob::STARTLINE );
         Bool_knob(f, &diffusion_conv_direct, "diffusion_conv_direct", "diffusion_conv_direct");

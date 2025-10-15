@@ -37,7 +37,7 @@ using namespace DD::Image;
 static const char* weight_type_names[] = {
   "f32", "f16", "q4_0", "q4_1", "q5_0", "q5_1", "q8_0", nullptr
 };
-std::vector<const char*> get_schedule_names() {
+inline std::vector<const char*> get_schedule_names() {
     std::vector<const char*> names;
     for (int i = 0; i < SCHEDULE_COUNT; ++i) {
         names.push_back(sd_schedule_name(scheduler_t(i)));
@@ -45,7 +45,7 @@ std::vector<const char*> get_schedule_names() {
     names.push_back(nullptr);
     return names;
 }
-std::vector<const char*> get_sample_method_names() {
+inline std::vector<const char*> get_sample_method_names() {
     std::vector<const char*> names;
     for (int i = 0; i < SAMPLE_METHOD_COUNT; ++i) {
         names.push_back(sd_sample_method_name(sample_method_t(i)));
@@ -53,7 +53,7 @@ std::vector<const char*> get_sample_method_names() {
     names.push_back(nullptr);
     return names;
 }
-std::vector<const char*> get_rng_type_names() {
+inline std::vector<const char*> get_rng_type_names() {
     std::vector<const char*> names;
     for (int i = 0; i < RNG_TYPE_COUNT; ++i) {
         names.push_back(sd_rng_type_name(rng_type_t(i)));
@@ -61,7 +61,7 @@ std::vector<const char*> get_rng_type_names() {
     names.push_back(nullptr);
     return names;
 }
-std::vector<const char*> get_sd_type_names() {
+inline std::vector<const char*> get_sd_type_names() {
     std::vector<const char*> names;
     for (int i = 0; i < SD_TYPE_COUNT; ++i) {
         names.push_back(sd_type_name(sd_type_t(i)));
@@ -70,7 +70,7 @@ std::vector<const char*> get_sd_type_names() {
     return names;
 }
 
-const char* modes_str[] = {
+inline const char* modes_str[] = {
     "img_gen",
     "vid_gen",
     nullptr,
@@ -83,7 +83,7 @@ enum SDMode {
     MODE_COUNT
 };
 
-const char* video_modes_str[] = {
+inline const char* video_modes_str[] = {
     "img2video",
     "first_last",
     "video2video",
@@ -114,7 +114,7 @@ static inline uint8_t f2u8(float v) {
     return static_cast<uint8_t>(v * 255.f + 0.5f);
 }
 
-sd_images_out input2sdimages(Iop* input, int w, int h, bool expect_alpha = true)
+inline sd_images_out input2sdimages(Iop* input, int w, int h, bool expect_alpha = true)
 {
     sd_images_out out;
 
@@ -156,7 +156,7 @@ sd_images_out input2sdimages(Iop* input, int w, int h, bool expect_alpha = true)
     return out;
 }
 
-void nuke_pretty_progress(int step, int steps, float time) {
+inline void nuke_pretty_progress(int step, int steps, float time) {
     if (step == 0) {
         return;
     }
@@ -182,7 +182,7 @@ void nuke_pretty_progress(int step, int steps, float time) {
     }
 }
 
-void create_output_directory(const std::string& path) {
+inline void create_output_directory(const std::string& path) {
     std::filesystem::path dir(path);
     if (!std::filesystem::exists(dir)) {
         std::error_code ec;
@@ -193,7 +193,7 @@ void create_output_directory(const std::string& path) {
     }
 }
 
-void save_image(const sd_image_t& img, const std::string output_path, bool is_jpg) {
+inline void save_image(const sd_image_t& img, const std::string output_path, bool is_jpg) {
     if (img.data == NULL) {
         return;
     }
@@ -236,7 +236,7 @@ void save_image(const sd_image_t& img, const std::string output_path, bool is_jp
     }
 }
 
-void nuke_sd_log_cb(enum sd_log_level_t level, const char* log, void* data) {
+inline void nuke_sd_log_cb(enum sd_log_level_t level, const char* log, void* data) {
     int tag_color;
     const char* level_str;
     FILE* out_stream = (level == SD_LOG_ERROR) ? stderr : stdout;
