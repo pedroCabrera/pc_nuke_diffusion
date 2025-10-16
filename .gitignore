@@ -30,3 +30,4 @@ python/
 *.zip
 
 tests/
+nuke/pc_nuke_diffusion/plugin_libs/NV_models*/*
