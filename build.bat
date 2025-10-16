@@ -16,5 +16,5 @@ if exist build (
 )
 
 cd build
-cmake -DCMAKE_PREFIX_PATH="C:\Program Files\Nuke15.2v4" -G "Visual Studio 16 2019" -A x64 -DSD_CUDA=ON ..
+cmake -DCMAKE_PREFIX_PATH="C:\Program Files\Nuke15.1v8" -G "Visual Studio 16 2019" -A x64 -DSD_CUDA=ON ..
 cmake --build . --config Release

@@ -22,6 +22,7 @@ class pc_sd_upscaler : public PlanarIop {
     int upscale_factor = 4;
     bool offload_params_to_cpu = false;
     bool diffusion_conv_direct  = false;
+    int upscale_tile = 128;
 
     sd_image_t upscaled_image;
     sd_images_out init_data;
@@ -129,7 +130,8 @@ public:
             upscaler_ctx = new_upscaler_ctx(model_path,
                                             offload_params_to_cpu,
                                             diffusion_conv_direct,
-                                            get_num_physical_cores());
+                                            get_num_physical_cores(),
+                                            upscale_tile);
             if (upscaler_ctx == NULL) {
                 error("Failed To load model.");
             }
@@ -150,7 +152,8 @@ public:
         SetFlags(f, Knob::STARTLINE );
         Int_knob(f, &upscale_factor, "upscale_factor", "upscale_factor");
         SetFlags(f, Knob::READ_ONLY);
-
+        Int_knob(f, &upscale_tile, "upscale_tile", "upscale_tile");
+         SetFlags(f, Knob::STARTLINE );
         Bool_knob(f, &offload_params_to_cpu, "offload_params_to_cpu", "offload_params_to_cpu");
         SetFlags(f, Knob::STARTLINE );
         Bool_knob(f, &diffusion_conv_direct, "diffusion_conv_direct", "diffusion_conv_direct");
