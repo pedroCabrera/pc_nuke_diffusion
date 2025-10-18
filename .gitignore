@@ -13,7 +13,7 @@ CMakeUserPresets.json
 
 .vscode
 *.code-workspace
-build/
+build*/
 out/
 models/
 
@@ -24,8 +24,7 @@ models/
 *.log
 *.obj
 *.exp
-packages/NVIDIA_VIDEO_EFFECTS_INSTAL_PATH
-packages/*.exe
+packages/installers*
 python/
 *.zip
 
