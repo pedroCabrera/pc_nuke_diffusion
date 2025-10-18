@@ -95,13 +95,13 @@ git submodule update --init --recursive
 
 ## Windows CUDA
 
-There is a [build.bat](https://github.com/pedroCabrera/pc_nuke_diffusion/blob/5766000838354034b7ef8209a89c7916bdf3e5cc/build.bat) that will call the [build_deps.bat](https://github.com/pedroCabrera/pc_nuke_diffusion/blob/5766000838354034b7ef8209a89c7916bdf3e5cc/build_deps.bat) and then will build the plugin for each nuke version defined in [build.bat](https://github.com/pedroCabrera/pc_nuke_diffusion/blob/5766000838354034b7ef8209a89c7916bdf3e5cc/build.bat)
+There is a [build.bat](./build.bat) that will call the [build_deps.bat](./build_deps.bat) and then will build the plugin for each nuke version defined in [build.bat](./build.bat)
 ```sh
 set "NUKE_14_1=C:/Program Files/Nuke14.1v1"
 set "NUKE_15_1=C:/Program Files/Nuke15.1v8"
 set "NUKE_15_2=C:/Program Files/Nuke15.2v4"
 ```
-The [build_deps.bat](https://github.com/pedroCabrera/pc_nuke_diffusion/blob/5766000838354034b7ef8209a89c7916bdf3e5cc/build_deps.bat) script that will build [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) and [Nvidia Maxine](https://docs.nvidia.com/deeplearning/maxine/vfx-sdk-system-guide/index.html) packages.
+The [build_deps.bat](./build_deps.bat) script that will build [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) and [Nvidia Maxine](https://docs.nvidia.com/deeplearning/maxine/vfx-sdk-system-guide/index.html) packages.
 
 ### Requirements
 You must download and install 
