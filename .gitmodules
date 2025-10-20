@@ -4,3 +4,6 @@
 [submodule "packages/Maxine-VFX-SDK"]
 	path = packages/Maxine-VFX-SDK
 	url = https://github.com/NVIDIA-Maxine/Maxine-VFX-SDK.git
+[submodule "packages/vision.cpp"]
+	path = packages/vision.cpp
+	url = https://github.com/Acly/vision.cpp.git
