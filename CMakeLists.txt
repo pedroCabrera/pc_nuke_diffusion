@@ -1,18 +1,27 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
+cmake_policy(SET CMP0077 NEW)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-find_package(CUDAToolkit REQUIRED)
-set(_cuda_runtime CUDA::cudart_static)
+
+set(PLUGIN_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/nuke/pc_nuke_diffusion/plugin_libs/${BACKEND}/${NUKE_VERSION}")
+set(SD_VULKAN ${BACKEND} STREQUAL "VULKAN")
+set(SD_CUDA ${BACKEND} STREQUAL "CUDA")
+
+
+if(SD_CUDA)
+  find_package(CUDAToolkit REQUIRED)
+  set(_cuda_runtime CUDA::cudart_static)
+endif()
+if(SD_VULKAN)
+  find_package(Vulkan REQUIRED)
+  
+endif()
 
 # Point to the deps install dir (set from your build.bat per earlier steps)
 set(DEPS_INSTALL_DIR "" CACHE PATH "Prebuilt deps install root")
 
 add_library(pc_deps INTERFACE)
-target_link_libraries(pc_deps INTERFACE
-  ${_cuda_runtime}
-  CUDA::cuda_driver
-  CUDA::cublas
-  # CUDA::cublasLt  # uncomment if you later get cublasLt* unresolveds
-)
+
 target_include_directories(pc_deps INTERFACE
   "${DEPS_INSTALL_DIR}/include"
 )
@@ -24,16 +33,26 @@ file(GLOB _deps_libs
 
 # Link them all transitively via the interface
 target_link_libraries(pc_deps INTERFACE ${_deps_libs})
-target_link_libraries(pc_deps INTERFACE ${_cuda_runtime_target})
 
-project(pc_nuke_diffusion LANGUAGES C CXX CUDA)
-set(PLUGIN_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/nuke/pc_nuke_diffusion/plugin_libs/${NUKE_VERSION}")
+if(SD_CUDA)
+  target_link_libraries(pc_deps INTERFACE
+    ${_cuda_runtime}
+    ${_cuda_runtime_target}
+    CUDA::cuda_driver
+    CUDA::cublas
+  )
+endif()
+if(SD_VULKAN)
+  target_link_libraries(pc_deps INTERFACE
+    Vulkan::Vulkan
+  )
+endif()
+project(pc_nuke_diffusion LANGUAGES C CXX)
 
 set(CMAKE_MODULE_PATH "CMake;${CMAKE_MODULE_PATH}")
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 find_package(Nuke REQUIRED)
-
 
 function(add_plugin PLUGIN_NAME)
     add_nuke_plugin(${PLUGIN_NAME} ${ARGN})
@@ -60,7 +79,7 @@ function(add_plugin PLUGIN_NAME)
     )
 endfunction()
 
-add_plugin(pc_nuke_diffusion   pc_sd_load_model.cpp pc_sd_inference.cpp pc_sd_upscaler.cpp pc_sd_nvfx_videoeffects.cpp)
+add_plugin(pc_nuke_diffusion  pc_sd_load_model.cpp pc_sd_inference.cpp pc_sd_upscaler.cpp pc_sd_nvfx_videoeffects.cpp)
 
 
 

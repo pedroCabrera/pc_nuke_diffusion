@@ -1,8 +1,25 @@
 cmake_minimum_required(VERSION 3.10)
-project(pc_deps LANGUAGES C CXX CUDA)
+project(pc_deps LANGUAGES C CXX)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-add_definitions(-DSD_CUDA -DSD_USE_CUDA)
+
+
+if(${BACKEND} STREQUAL "VULKAN")
+    set(SD_VULKAN ON CACHE BOOL "Use Vulkan backend")
+    set(SD_CUDA OFF CACHE BOOL "Use CUDA backend")
+elseif(${BACKEND} STREQUAL "CUDA")
+    set(SD_VULKAN OFF CACHE BOOL "Use Vulkan backend")
+    set(SD_CUDA ON CACHE BOOL "Use CUDA backend")
+else()
+    set(SD_VULKAN OFF CACHE BOOL "Use Vulkan backend")
+    set(SD_CUDA OFF CACHE BOOL "Use CUDA backend")
+endif()
+message(STATUS "Using ${BACKEND} backend")
+message(STATUS "SD_VULKAN: ${SD_VULKAN}")
+message(STATUS "SD_CUDA: ${SD_CUDA}")
+#set(GGML_CUDA ${NK_CUDA})
+#set(GGML_VULKAN ${NK_VULKAN})
+
 
 if(MSVC)
   add_compile_options(
@@ -10,7 +27,9 @@ if(MSVC)
     $<$<COMPILE_LANGUAGE:CXX>:/bigobj>
     $<$<COMPILE_LANGUAGE:C>:/MP>
     $<$<COMPILE_LANGUAGE:CXX>:/MP>)
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=\"/bigobj /MP\"")
+  if(NK_CUDA)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=\"/bigobj /MP\"")
+  endif()
   
 endif()
 
