@@ -1,0 +1,278 @@
+#! C:/Program Files/Nuke15.2v4/nuke-15.2.4.dll -nx
+version 15.2 v4
+define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
+<layout version="1.0">
+    <window x="0" y="0" w="1917" h="1000" screen="0">
+        <splitter orientation="1">
+            <split size="1344"/>
+            <splitter orientation="1">
+                <split size="670"/>
+                <dock id="" activePageId="Viewer.1">
+                    <page id="Viewer.1"/>
+                </dock>
+                <split size="670"/>
+                <dock id="" activePageId="DAG.1" focus="true">
+                    <page id="DAG.1"/>
+                </dock>
+            </splitter>
+            <split size="569"/>
+            <splitter orientation="2">
+                <split size="754"/>
+                <dock id="" activePageId="Properties.1">
+                    <page id="Properties.1"/>
+                </dock>
+                <split size="204"/>
+                <dock id="" activePageId="uk.co.thefoundry.scripteditor.1">
+                    <page id="uk.co.thefoundry.scripteditor.1"/>
+                </dock>
+            </splitter>
+        </splitter>
+    </window>
+</layout>
+}
+Root {
+ inputs 0
+ name F:/pedro/ENVIRONMENTS/pc_nuke_diffusion/nuke/pc_nuke_diffusion/sample_scenes/Flux_v01.nk
+ project_directory "\[python \{\"\{0\}\".format(os.path.dirname(nuke.script_directory()))\}]"
+ format "2048 1556 0 0 2048 1556 1 2K_Super_35(full-ap)"
+ proxy_type scale
+ proxy_format "1024 778 0 0 1024 778 1 1K_Super_35(full-ap)"
+ colorManagement OCIO
+ OCIO_config aces_1.2
+ defaultViewerLUT "OCIO LUTs"
+ workingSpaceLUT scene_linear
+ monitorLut "sRGB (ACES)"
+ monitorOutLUT "sRGB (ACES)"
+ int8Lut matte_paint
+ int16Lut texture_paint
+ logLut compositing_log
+ floatLut scene_linear
+}
+pc_sd_load_model {
+ inputs 0
+ diffusion_model models/FLUX/flux1-fill-dev-Q8_0.gguf
+ clip_l models/FLUX/clip_l_FLUX.safetensors
+ t5xxl models/FLUX/t5xxl_fp16_FLUX.safetensors
+ vae models/FLUX/ae_FLUX.safetensors
+ name pc_sd_load_model1
+ xpos -140
+ ypos -96
+}
+Read {
+ inputs 0
+ file_type jpeg
+ file F:/pedro/ENVIRONMENTS/pc_nuke_diffusion/nuke/pc_nuke_diffusion/sample_scenes/test_files/PCM_103_063_0010_jpeg_v001/PCM_103_063_0010_v001.1001.jpg
+ format "1920 1080 0 0 1920 1080 1 HD_1080"
+ origset true
+ colorspace color_picking
+ name Read1
+ xpos 48
+ ypos -388
+}
+Roto {
+ output alpha
+ cliptype none
+ curves {{{v x3f99999a}
+  {f 0}
+  {n
+   {layer Root
+    {f 2097152}
+    {t x44700000 x44070000}
+    {a pt1x 0 pt1y 0 pt2x 0 pt2y 0 pt3x 0 pt3y 0 pt4x 0 pt4y 0 ptex00 0 ptex01 0 ptex02 0 ptex03 0 ptex10 0 ptex11 0 ptex12 0 ptex13 0 ptex20 0 ptex21 0 ptex22 0 ptex23 0 ptex30 0 ptex31 0 ptex32 0 ptex33 0 ptof1x 0 ptof1y 0 ptof2x 0 ptof2y 0 ptof3x 0 ptof3y 0 ptof4x 0 ptof4y 0 pterr 0 ptrefset 0 ptmot x40800000 ptref 0}
+    {curvegroup Bezier1 512 bezier
+     {{cc
+       {f 8192}
+       {px 1
+        {x41a00000 x40800000}
+        {x44826000 x446b4000}
+        {xc1a00000 xc0800000}
+        {xc1000000 x41d00000}
+        {x445c0000 x44318000}
+        {x41000000 xc1d00000}
+        {x41200000 x41900000}
+        {x445f0000 x44028000}
+        {xc1200000 xc1900000}
+        {0 0}
+        {x441d0000 xc2280000}
+        {0 0}
+        {0 0}
+        {x44cd8000 xc2c00000}
+        {0 0}
+        {x41000000 xc1400000}
+        {x44c38000 x43f70000}
+        {xc1000000 x41400000}
+        {x41200000 xc0c00000}
+        {x44a8c000 x44208000}
+        {xc1200000 x40c00000}
+        {x42100000 xc2080000}
+        {x449e4000 x44688000}
+        {xc2100000 x42080000}}}     idem}
+     {tx 1 x4490c000 x43fe4000}
+     {a osw x41200000 osf 0 str 1 spx x44700000 spy x44070000 sb 1 tt x40800000}}}}}}
+ toolbox {selectAll {
+  { selectAll str 1 ssx 1 ssy 1 sf 1 }
+  { createBezier str 1 ssx 1 ssy 1 sf 1 sb 1 tt 4 }
+  { createBezierCusped str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { createBSpline str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { createEllipse str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { createRectangle str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { createRectangleCusped str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { brush str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { eraser src 2 str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { clone src 1 str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { reveal src 3 str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { dodge src 1 str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { burn src 1 str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { blur src 1 str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { sharpen src 1 str 1 ssx 1 ssy 1 sf 1 sb 1 }
+  { smear src 1 str 1 ssx 1 ssy 1 sf 1 sb 1 }
+} }
+ toolbar_brush_hardness 0.200000003
+ toolbar_source_transform_scale {1 1}
+ toolbar_source_transform_center {960 540}
+ colorOverlay {0 0 0 0}
+ lifetime_type "all frames"
+ motionblur_shutter_offset_type centred
+ source_black_outside true
+ name Roto1
+ xpos 48
+ ypos -292
+}
+Crop {
+ box {0 0 1920 1080}
+ name Crop1
+ xpos 48
+ ypos -256
+}
+Reformat {
+ type scale
+ scale 0.5
+ name Reformat1
+ xpos 48
+ ypos -232
+}
+Reformat {
+ type "to box"
+ box_width {{floor(input.width/factor)*factor}}
+ box_height {{floor(input.height/factor)*factor}}
+ box_fixed true
+ name Reformat2
+ xpos 48
+ ypos -185
+ addUserKnob {20 User}
+ addUserKnob {3 factor}
+ factor 16
+}
+OCIOColorSpace {
+ in_colorspace scene_linear
+ out_colorspace "Output - Rec.709"
+ name OCIOColorSpace1
+ xpos 48
+ ypos -161
+}
+pc_sd_inference {
+ inputs 2
+ format {960 528}
+ "Temp Files" 0
+ prompt "A bridge"
+ sample_method euler
+ txt_cfg 1
+ "Wan Video" 0
+ ControlNet 0
+ token 7
+ name pc_sd_inference1
+ xpos 48
+ ypos -73
+}
+set N2cbf4300 [stack 0]
+Read {
+ inputs 0
+ file_type jpeg
+ file C:/Users/pedro/Desktop/Puente_de_Nuestra_Señora_del_Pilar,_Puente_de_Hierro_01.jpg
+ format "3456 2304 0 0 3456 2304 1 "
+ origset true
+ name Read2
+ xpos 240
+ ypos -218
+}
+Reformat {
+ format "3840 2160 0 0 3840 2160 1 UHD_4K"
+ name Reformat5
+ xpos 240
+ ypos -122
+}
+Reformat {
+ type scale
+ scale 0.5
+ name Reformat3
+ xpos 240
+ ypos -69
+}
+Reformat {
+ type "to box"
+ box_width {{floor(input.width/factor)*factor}}
+ box_height {{floor(input.height/factor)*factor}}
+ box_fixed true
+ name Reformat4
+ xpos 240
+ ypos -22
+ addUserKnob {20 User}
+ addUserKnob {3 factor}
+ factor 16
+}
+OCIOColorSpace {
+ in_colorspace scene_linear
+ out_colorspace "Output - Rec.709"
+ name OCIOColorSpace2
+ xpos 240
+ ypos 2
+}
+set N2c8af700 [stack 0]
+Viewer {
+ inputs 2
+ frame_range 1-100
+ viewerProcess "Raw (ACES)"
+ monitorOutNDISenderName "NukeX - Flux_v01 - Viewer1"
+ name Viewer1
+ xpos 166
+ ypos 143
+ addUserKnob {20 viewerLockInputStates +INVISIBLE}
+ addUserKnob {26 READ_ME -STARTLINE +INVISIBLE T "The following knobs are needed for the Viewer Lock\nplugin to function. If you don't have Viewer Lock,\nyou can safely ignore or delete them.\n\nIf they're causing problems, let me know at\nmatt_roe@live.com.\n"}
+ addUserKnob {6 inputState0 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState1 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState2 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState3 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState4 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState5 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState6 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState7 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState8 +INVISIBLE +STARTLINE}
+ addUserKnob {6 inputState9 +INVISIBLE +STARTLINE}
+}
+push $N2c8af700
+push $N2cbf4300
+Remove {
+ channels alpha
+ name Remove1
+ xpos 48
+ ypos -14
+}
+push 0
+pc_sd_load_model {
+ inputs 0
+ diffusion_model models/FLUX/flux1-kontext-dev-Q8_0.gguf
+ clip_l models/FLUX/clip_l_FLUX.safetensors
+ t5xxl models/FLUX/t5xxl_fp16_FLUX.safetensors
+ vae models/FLUX/ae_FLUX.safetensors
+ name pc_sd_load_model2
+ xpos -132
+ ypos -4
+}
+push 0
+pc_sd_inference {
+ inputs 3+2
+ prompt "Replace the white bridge for the green one"
+ name pc_sd_inference2
+ xpos 48
+ ypos 74
+}

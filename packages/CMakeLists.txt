@@ -69,6 +69,6 @@ install(TARGETS ${TARGET} RUNTIME)
 target_link_libraries(${TARGET} PRIVATE stable-diffusion  ${CMAKE_THREAD_LIBS_INIT})
 target_compile_features(${TARGET} PUBLIC c_std_11 cxx_std_17)
 install(TARGETS sd
-  RUNTIME DESTINATION ${PLUGIN_OUTPUT_DIR}
+  RUNTIME DESTINATION "${PLUGIN_OUTPUT_DIR}/bin/${BACKEND}"
 )
 # ---------------------------------------------------------------------------------        

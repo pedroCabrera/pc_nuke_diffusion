@@ -17,7 +17,8 @@ static const char* const HELP = "Stable Diffusion For Nuke";
 
 class pc_sd_load_model : public NoIop,  Executable, public model_loaderNode {
 
-    const char* model_path = "[python {os.getenv('STD_MODEL') + '/v1-5-pruned-emaonly.safetensors'}]";
+    int n_threads = -1;
+    const char* model_path = "";
     const char* diffusion_model_path = "";
     const char* high_noise_diffusion_model_path = "";
 
@@ -29,21 +30,26 @@ class pc_sd_load_model : public NoIop,  Executable, public model_loaderNode {
     const char* clip_vision_path = "";
     const char* t5xxl_path = "";
 
+    const char* qwen2vl_path = "";
+    const char* qwen2vl_vision_path = "";
+
+
     const char* vae_path = "";
     const char* taesd_path = "";
-    const char* controlnet_path = "";
+    const char* control_net_path = "";
 
-    const char* lora_model_dir = "[python {os.getenv('STD_LORAS')}]";
+    const char* lora_model_dir = "";
 
     bool convert_weights = false;
     int weight_type = 0;
 
     bool vae_decode_only = false;
-    bool offload_params_to_cpu = false;
+    bool offload_params_to_cpu = true;
     bool keep_clip_on_cpu = false;
     bool keep_control_net_on_cpu = false;
     bool keep_vae_on_cpu = false;
-    bool diffusion_flash_attn = false;
+
+    bool diffusion_flash_attn = true;
 
     bool diffusion_conv_direct = false;
     bool vae_conv_direct = false;
@@ -96,17 +102,19 @@ public:
             sd_ctx_params.clip_g_path = clip_g_path;
             sd_ctx_params.clip_vision_path = clip_vision_path;
             sd_ctx_params.t5xxl_path = t5xxl_path;
+            sd_ctx_params.qwen2vl_path = qwen2vl_path;
+            sd_ctx_params.qwen2vl_vision_path = qwen2vl_vision_path;
             sd_ctx_params.diffusion_model_path = diffusion_model_path;
             sd_ctx_params.high_noise_diffusion_model_path = high_noise_diffusion_model_path;
             sd_ctx_params.vae_path = vae_path;
             sd_ctx_params.taesd_path = taesd_path;
-            sd_ctx_params.control_net_path = controlnet_path;
+            sd_ctx_params.control_net_path = control_net_path;
             sd_ctx_params.lora_model_dir = lora_model_dir;
             sd_ctx_params.embedding_dir = embedding_dir;
             sd_ctx_params.photo_maker_path = photo_maker_path;
             sd_ctx_params.vae_decode_only = vae_decode_only;
             sd_ctx_params.free_params_immediately = false;
-            sd_ctx_params.n_threads = get_num_physical_cores();
+            sd_ctx_params.n_threads = n_threads;
             sd_ctx_params.wtype = SD_TYPE_COUNT;//wtype;
             sd_ctx_params.rng_type = CUDA_RNG;
             sd_ctx_params.offload_params_to_cpu = offload_params_to_cpu;
@@ -181,9 +189,12 @@ public:
     File_knob(f, &clip_vision_path, "clip_vision", "clip_vision");
     File_knob(f, &t5xxl_path, "t5xxl", "t5xxl");
 
+    File_knob(f, &qwen2vl_path, "qwen2vl", "qwen2vl");
+    File_knob(f, &qwen2vl_vision_path, "qwen2vl_vision", "qwen2vl_vision");
+
     File_knob(f, &vae_path, "vae", "vae");
     File_knob(f, &taesd_path, "taesd", "taesd");
-    File_knob(f, &controlnet_path, "controlnet", "controlnet");
+    File_knob(f, &control_net_path, "controlnet", "controlnet");
 
     File_knob(f, &lora_model_dir, "lora_models_directory", "lora_models_directory");
 
@@ -197,6 +208,10 @@ public:
     SetFlags(f, Knob::STARTLINE );
 
     BeginGroup(f, "Optimization");
+
+    Int_knob(f, &n_threads, "n_threads", "n_threads"); 
+    SetFlags(f, Knob::STARTLINE );
+
     Bool_knob(f, &convert_weights, "convert_weights", "convert_weights");
     SetFlags(f, Knob::STARTLINE ); 
     Enumeration_knob(f, &weight_type, weight_type_names, "weight_type", "weight_type"); 

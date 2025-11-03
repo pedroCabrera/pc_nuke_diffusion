@@ -24,6 +24,8 @@ models/
 *.log
 *.obj
 *.exp
+*.egg-info
 packages/installers*
 
-nuke/pc_nuke_diffusion/plugin_libs/NV_models*/*
+*.venv
+uv.lock

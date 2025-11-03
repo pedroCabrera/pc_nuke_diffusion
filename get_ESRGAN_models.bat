@@ -1,0 +1,1 @@
+git clone https://huggingface.co/pedroCabrera/ESRGAN_cpp ./nuke/pc_nuke_diffusion/models/ESRGAN

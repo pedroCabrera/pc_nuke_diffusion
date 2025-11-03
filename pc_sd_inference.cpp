@@ -27,7 +27,8 @@ class pc_sd_inference : public Iop, Executable{
     int sample_method = 0; 
     int schedule = 0;
     bool vae_tiling = false;  
-
+    int tile_size = 32;
+    float tile_overlap = 0.5f;
     // Format
     double format_w, format_y;
     int cached_format_w, cached_format_y;
@@ -51,11 +52,27 @@ class pc_sd_inference : public Iop, Executable{
     int seed = -1;
     float strength = 1.0;
     int sample_steps = 20;
+    int high_noise_sample_steps = -1;
+
+
     int clip_skip = -1;
     float txt_cfg = 7.5;
-    
+    float img_cfg = -1.0;
+    float guidance = 3.5;
+
+    float high_noise_txt_cfg = 7.0;
+    float high_noise_img_cfg = -1.0;
+    float high_noise_guidance = 3.5;
+
+    float slg_scale = 0.0f;
+    float slg_layer_start = 0.01f;
+    float slg_layer_end = 0.2f;
+
+    float high_noise_slg_scale = 0.0f;
+    float high_noise_slg_layer_start = 0.01f;
+    float high_noise_slg_layer_end = 0.2f;
+
     // ControlNet
-    bool canny_preprocess = false;
     float control_strength = 0.9;
     // Photo Maker
     float pm_style_strength = 20.0;
@@ -222,14 +239,26 @@ public:
             sample_params.sample_method = (sample_method_t)sample_method;
             sample_params.sample_steps = sample_steps;
             sample_params.guidance.txt_cfg = txt_cfg;
-            
-            if (!isfinite(sample_params.guidance.img_cfg)) {
+            sample_params.guidance.img_cfg = img_cfg;
+            sample_params.guidance.distilled_guidance = guidance;
+            sample_params.guidance.slg.scale = slg_scale;
+            sample_params.guidance.slg.layer_start = slg_layer_start;
+            sample_params.guidance.slg.layer_end = slg_layer_end;
+
+            high_noise_sample_params.sample_steps = high_noise_sample_steps;
+
+            if (sample_params.guidance.img_cfg < 0.0f) {
                 sample_params.guidance.img_cfg = sample_params.guidance.txt_cfg;
             }
 
-            if (!isfinite(high_noise_sample_params.guidance.img_cfg)) {
+            if (high_noise_sample_params.guidance.img_cfg < 0.0f) {
                 high_noise_sample_params.guidance.img_cfg = high_noise_sample_params.guidance.txt_cfg;
             }
+
+            vae_tiling_params.enabled = vae_tiling;
+            vae_tiling_params.tile_size_x = tile_size;
+            vae_tiling_params.tile_size_y = tile_size;
+            vae_tiling_params.target_overlap = tile_overlap;
 
             printf("Cleaning Cached Results\n");
             if (results != NULL) {
@@ -327,7 +356,7 @@ public:
                 results     = generate_video(sd_ctx, &vid_gen_params, &num_results);
             }
 
-            if(isConnected(1)){
+            if(isConnected(0)){
                 if(use_init_image_as_ref == false){
                     printf("Cleaning Input IMAGE\n");
                     free(init_image.data);
@@ -426,48 +455,80 @@ public:
         Int_knob(f, &output_index, "output_index", "output_index");
         SetFlags(f, Knob::SLIDER);
 
-        Multiline_String_knob(f, &prompt, "prompt", "prompt",5 );
-        Multiline_String_knob(f, &negative_prompt, "negative_prompt", "negative_prompt", 5 );
-
-        Bool_knob(f, &use_init_image_as_ref, "use_init_image_as_ref", "use_init_image_as_ref");
-        SetFlags(f, Knob::STARTLINE );
-
-        BeginGroup(f, "Sample Params");
-        Enumeration_knob(f, &sample_method, sample_method_names.data(), "sample_method", "sample_method");   
-        Enumeration_knob(f, &schedule, schedule_names.data(), "schedule", "schedule");  
-
-        Int_knob(f, &sample_steps, "sample_steps", "sample_steps");
-        SetFlags(f, Knob::SLIDER);
-
-        Int_knob(f, &seed, "seed", "seed");
-        SetFlags(f, Knob::SLIDER);
-
-        Float_knob(f, &txt_cfg, "txt_cfg", "txt_cfg");
-        Float_knob(f, &strength, "strength", "strength");
-        Int_knob(f, &clip_skip, "clip_skip", "clip_skip");
-        EndGroup(f);
-
-        BeginGroup(f, "Wan Video");
-        Float_knob(f, &moe_boundary, "moe_boundary", "moe_boundary");
-        SetFlags(f, Knob::SLIDER);
-        Float_knob(f, &vace_strength, "vace_strength", "vace_strength");
-        SetFlags(f, Knob::SLIDER);
-        EndGroup(f);
-  
-        //Float_knob(f, &pm_style_strength, "photomaker_style_strength", "photomaker_style_strength");
-        //Bool_knob(f, &vae_tiling, "vae_tiling", "vae_tiling");
-
-        BeginGroup(f, "ControlNet");
-        Bool_knob(f,&canny_preprocess, "canny_preprocess","canny_preprocess");
-        SetFlags(f, Knob::STARTLINE );        
-        Float_knob(f, &control_strength, "control_strength", "control_strength");
-        EndGroup(f);
-
         BeginGroup(f, "Temp Files");
         Bool_knob(f, &temp_save, "save_temporal_files", "save_temporal_files");
         SetFlags(f, Knob::STARTLINE );  
         File_knob(f, &temp_path, "temp_path", "temp_path");
         SetFlags(f, Knob::STARTLINE );
+        EndGroup(f);
+
+        BeginGroup(f, "Prompt");
+        Multiline_String_knob(f, &prompt, "prompt", "prompt",5 );
+        Multiline_String_knob(f, &negative_prompt, "negative_prompt", "negative_prompt", 5 );
+        EndGroup(f);
+
+        BeginGroup(f, "Sample Params");
+        Bool_knob(f, &use_init_image_as_ref, "use_init_image_as_ref", "use_init_image_as_ref");
+        SetFlags(f, Knob::STARTLINE );
+
+        Enumeration_knob(f, &sample_method, sample_method_names.data(), "sample_method", "sample_method");   
+        Enumeration_knob(f, &schedule, schedule_names.data(), "schedule", "schedule");  
+
+        Int_knob(f, &sample_steps, "sample_steps", "sample_steps");
+        SetFlags(f, Knob::SLIDER);
+    
+        Int_knob(f, &seed, "seed", "seed");
+        SetFlags(f, Knob::SLIDER);
+
+        Float_knob(f, &txt_cfg, "txt_cfg", "txt_cfg");
+        Float_knob(f, &img_cfg, "img_cfg", "img_cfg");
+        Float_knob(f, &guidance, "guidance", "guidance");
+        Float_knob(f, &strength, "strength", "strength");
+        SetRange(f, 0.0, 1.0);
+
+        Int_knob(f, &clip_skip, "clip_skip", "clip_skip");
+        EndGroup(f);
+
+        BeginGroup(f, "High Noise Params");
+        Int_knob(f, &high_noise_sample_steps, "high_noise_sample_steps", "high_noise_sample_steps");
+        SetFlags(f, Knob::SLIDER);            
+        Float_knob(f, &high_noise_txt_cfg, "high_noise_txt_cfg", "high_noise_txt_cfg");
+        Float_knob(f, &high_noise_img_cfg, "high_noise_img_cfg", "high_noise_img_cfg");
+        Float_knob(f, &high_noise_guidance, "high_noise_guidance", "high_noise_guidance");
+        EndGroup(f);
+
+        BeginGroup(f, "skip layer guidance (SLG)");
+        Float_knob(f, &slg_scale, "slg_scale", "slg_scale");
+        Float_knob(f, &slg_layer_start, "slg_layer_start", "slg_layer_start");
+        Float_knob(f, &slg_layer_end, "slg_layer_end", "slg_layer_end");
+
+        Float_knob(f, &high_noise_slg_scale, "high_noise_slg_scale", "high_noise_slg_scale");
+        Float_knob(f, &high_noise_slg_layer_start, "high_noise_slg_layer_start", "high_noise_slg_layer_start");
+        Float_knob(f, &high_noise_slg_layer_end, "high_noise_slg_layer_end", "high_noise_slg_layer_end");
+        EndGroup(f);
+
+
+        BeginGroup(f, "Wan Video");
+        Float_knob(f, &vace_strength, "vace_strength", "vace_strength");
+        SetFlags(f, Knob::SLIDER);
+        Float_knob(f, &moe_boundary, "moe_boundary", "moe_boundary");
+        SetFlags(f, Knob::SLIDER);
+
+        EndGroup(f);
+  
+        //Float_knob(f, &pm_style_strength, "photomaker_style_strength", "photomaker_style_strength");
+        BeginGroup(f, "VAE Tiling");
+        Bool_knob(f, &vae_tiling, "vae_tiling", "vae_tiling");
+        SetFlags(f, Knob::STARTLINE );
+        Int_knob(f, &tile_size, "vae_tile_size", "vae_tile_size");
+        SetFlags(f, Knob::SLIDER);
+        Float_knob(f, &tile_overlap, "vae_tile_overlap", "vae_tile_overlap");
+        SetFlags(f, Knob::SLIDER);
+        SetRange(f, 0.0, 1.0);
+        EndGroup(f);
+
+        BeginGroup(f, "ControlNet");    
+        Float_knob(f, &control_strength, "control_strength", "control_strength");
         EndGroup(f);
 
         Int_knob(f, &token_, "token", "");               // Force update when changed

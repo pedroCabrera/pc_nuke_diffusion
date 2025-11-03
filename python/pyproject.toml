@@ -1,0 +1,45 @@
+[project]
+dynamic = ["version"]
+name = "pc_nuke_diffusion"
+requires-python = ">=3.12"
+dependencies = [
+    "torch",
+    "torchvision",
+    "timm",
+    "pytest",
+    "opencv-python",
+    "ruff",
+    "einops>=0.8.1",
+    "spandrel>=0.4.1",
+    "gguf>=0.17.1",
+]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+preview = true
+
+[tool.ruff.lint]
+ignore = ["E741"]
+
+[tool.black]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
